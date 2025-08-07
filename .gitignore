@@ -1,0 +1,8 @@
+*.pyc
+__pycache__/
+
+#ignore env
+.env
+.env.*
+
+base.py
