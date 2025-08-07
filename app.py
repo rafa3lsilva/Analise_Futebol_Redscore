@@ -12,6 +12,22 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+st.sidebar.header("📊 Análise de Jogos de Futebol"
+                    )
+# Tutorial
+tutorial_url = "https://www.notion.so/Tutorial-Flashscore-2484bab1283b80f4b051e65d782a19d5?source=copy_link"
+
+st.sidebar.markdown(f"""
+    <div style="text-align: center; font-size: 16px;">
+        <a href="{tutorial_url}" target="_blank" style="text-decoration: none;">
+            <div style="margin-bottom: 10px; background-color:#1f77b4; padding:8px; border-radius:6px; color:white;">
+                📚 Tutorial
+            </div>
+        </a>
+    </div>
+""", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+
 # Inicializa o estado
 if "dados_jogos" not in st.session_state:
     st.session_state.dados_jogos = None
@@ -106,6 +122,29 @@ if not st.session_state.dados_jogos:
         st.rerun()
 
 df = st.session_state.df_jogos
-# Exibe os dados
-st.subheader("📊 Dados Extraídos")
-st.write(df)
+
+# Exibe os dados apenas se o DataFrame não estiver vazio
+if not df.empty:
+    #st.subheader("📊 Dados Extraídos")
+    st.dataframe(df)
+
+
+    home_team = df["Home"].unique()[0] if not df.empty else 'Home'
+    away_team = df["Away"].unique()[0] if not df.empty else 'Away'
+
+    st.sidebar.write("### Confronto:")
+
+    # Layout vertical centralizado
+    st.sidebar.markdown(f"""
+            <div style="text-align: center; font-size: 16px;">
+                <div style="margin-bottom: 10px; background-color:#1f77b4; padding:8px; border-radius:6px; color:white;">
+                    🏠 {home_team}
+                </div>
+                <div style="margin-bottom: 5px;">⚔️ vs</div>
+                <div style="background-color:#d62728; padding:8px; border-radius:6px; color:white;">
+                    ✈️ {away_team}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+    st.sidebar.markdown("---")
+
