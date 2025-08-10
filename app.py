@@ -114,6 +114,17 @@ if not df.empty:
         """, unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # Taxa de Vitórias home
+    df_home['resultado'] = df_home['H_Gols_FT'] > df_home['A_Gols_FT']
+    vitoria = df_home[df_home['resultado'] == 1].shape[0]
+    tx_vitoria = (vitoria / num_jogos) * 100
+
+    # Taxa de Vitórias away
+    df_away['resultado'] = df_away['A_Gols_FT'] > df_away['H_Gols_FT']
+    vitoria_away = df_away[df_away['resultado'] == 1].shape[0]
+    tx_vitoria_away = (vitoria_away / num_jogos) * 100
+    
+
     # filtro para exibir os últimos jogos (Home)
     df_home = df.iloc[0:num_jogos]
     st.write(f"### Últimos {num_jogos} jogos do {home_team}:")
