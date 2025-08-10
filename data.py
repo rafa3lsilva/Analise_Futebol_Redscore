@@ -69,3 +69,20 @@ def extrair_dados(linhas):
             i += 1
 
     return pd.DataFrame(jogos)
+
+#funções para calcular as médias de gols
+def media_home_gols_feitos(df_home):
+    media_gols_feitos = df_home["H_Gols_FT"].mean() if not df_home.empty else 0
+    return media_gols_feitos
+
+def media_home_gols_sofridos(df_home):
+    media_gols_sofridos = df_home["A_Gols_FT"].mean() if not df_home.empty else 0
+    return media_gols_sofridos
+
+def media_away_gols_feitos(df_away):
+    media_gols_feitos = df_away["A_Gols_FT"].mean() if not df_away.empty else 0
+    return media_gols_feitos
+
+def media_away_gols_sofridos(df_away):
+    media_gols_sofridos = df_away["H_Gols_FT"].mean() if not df_away.empty else 0
+    return media_gols_sofridos

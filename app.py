@@ -66,7 +66,7 @@ if st.session_state.dados_jogos:
 # Exibe os dados apenas se o DataFrame não estiver vazio
 if not df.empty:
     #st.subheader("📊 Dados Extraídos")
-    st.dataframe(df)
+    #st.dataframe(df)
 
     # Seleção do intervalo de jogos
     intervalo = st.radio("Selecione o intervalo de jogos:",
@@ -88,6 +88,31 @@ if not df.empty:
 
     # Exibe o confronto atual
     sb.confronto_atual(home_team, away_team)
+
+    # Exibe as médias de gols
+    media_home_gols_marcados = dt.media_home_gols_feitos(df_home)
+    media_home_gols_sofridos = dt.media_home_gols_sofridos(df_home)
+    media_away_gols_marcados = dt.media_away_gols_feitos(df_away)
+    media_away_gols_sofridos = dt.media_away_gols_sofridos(df_away)
+
+    #exibe as médias de gols
+    st.markdown("### 📋 Médias de Gols Home e Away", unsafe_allow_html=True)
+
+    st.markdown(f"""
+    <div style="display: flex; justify-content: space-around;">
+        <div style="background-color:#1f77b4; padding:15px; border-radius:8px; width:45%; text-align:center; color:white;">
+            <h3>🏠 {home_team}</h3>
+            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_home_gols_marcados:.2f}</strong></p>
+            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_home_gols_sofridos:.2f}</strong></p>
+        </div>
+        <div style="background-color:#d62728; padding:15px; border-radius:8px; width:45%; text-align:center; color:white;">
+            <h3>✈️ {away_team}</h3>
+            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_away_gols_marcados:.2f}</strong></p>
+            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_away_gols_sofridos:.2f}</strong></p>
+        </div>
+    </div>
+        """, unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # filtro para exibir os últimos jogos (Home)
     df_home = df.iloc[0:num_jogos]
