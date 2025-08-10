@@ -69,4 +69,3 @@ def extrair_dados(linhas):
             i += 1
 
     return pd.DataFrame(jogos)
-    
