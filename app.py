@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-#import re
 import data as dt
 import sidebar as sb
 
@@ -112,7 +111,7 @@ if not df.empty:
         </div>
     </div>
         """, unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
     # Taxa de Vitórias home
     df_home['resultado'] = df_home['H_Gols_FT'] > df_home['A_Gols_FT']
@@ -123,7 +122,59 @@ if not df.empty:
     df_away['resultado'] = df_away['A_Gols_FT'] > df_away['H_Gols_FT']
     vitoria_away = df_away[df_away['resultado'] == 1].shape[0]
     tx_vitoria_away = (vitoria_away / num_jogos) * 100
+
+    # Calcula os dados
+    vencedor, score_home, score_away, prob_home, prob_away, prob_draw, odd_home, odd_away, odd_draw = dt.estimar_vencedor(
+        df_home, df_away)
+
+    if vencedor == 'home':
+        vencedor = home_team
+    elif vencedor == 'away':
+        vencedor = away_team
+    else:
+        vencedor = 'Empate'
+
+    cor = "#4CAF50" if vencedor == home_team else "#F44336" if vencedor == away_team else "#607D8B"
+
+    st.markdown(
+        f"""
+        <div style='background-color:{cor};padding:10px;border-radius:8px'>
+            <h3 style='color:white;text-align:center'>🏆 Vencedor Estimado: {vencedor}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(f"### 🏠 {home_team}")
+        st.metric("Probabilidade de Vitória", f"{prob_home}%")
+        st.metric("Odds Justas", f"{odd_home:.2f}")
+    with col2:
+        st.markdown(f"### ✈️ {away_team}")
+        st.metric("Probabilidade de Vitória", f"{prob_away}%")
+        st.metric("Odds Justas", f"{odd_away:.2f}")
+    with col3:
+        st.markdown("### ⚖️ Empate")
+        st.metric("Probabilidade de Empate", f"{prob_draw}%")
+        st.metric("Odds Justas", f"{odd_draw:.2f}")        
+
+    st.write(f"{home_team} - Pontuação Ofensiva",
+             f"{score_home}", " -- Taxa de Vitórias", f"{tx_vitoria:.2f}%")
+
+    st.write(f"{away_team} - Pontuação Ofensiva",
+             f"{score_away}", " -- Taxa de Vitórias", f"{tx_vitoria_away:.2f}%")
     
+    # filtro para exibir os últimos jogos (Home)
+    df_home = df.iloc[0:num_jogos]
+    st.write(f"### Últimos {num_jogos} jogos do {home_team}:")
+    st.dataframe(drop_reset_index(df_home))
+
+    # filtro para exibir os últimos jogos (Away)
+    df_away = df.iloc[12:12 + num_jogos]
+    st.write(f"### Últimos {num_jogos} jogos do {away_team}:")
+    st.dataframe(drop_reset_index(df_away))
 
     # filtro para exibir os últimos jogos (Home)
     df_home = df.iloc[0:num_jogos]
