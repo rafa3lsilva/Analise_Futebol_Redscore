@@ -3,7 +3,6 @@ import pandas as pd
 import data as dt
 import sidebar as sb
 
-
 def drop_reset_index(df):
     df = df.dropna()
     df = df.reset_index(drop=True)
@@ -165,16 +164,35 @@ if not df.empty:
 
     st.write(f"{away_team} - Pontuação Ofensiva",
              f"{score_away}", " -- Taxa de Vitórias", f"{tx_vitoria_away:.2f}%")
-    
-    # filtro para exibir os últimos jogos (Home)
-    df_home = df.iloc[0:num_jogos]
-    st.write(f"### Últimos {num_jogos} jogos do {home_team}:")
-    st.dataframe(drop_reset_index(df_home))
 
-    # filtro para exibir os últimos jogos (Away)
-    df_away = df.iloc[12:12 + num_jogos]
-    st.write(f"### Últimos {num_jogos} jogos do {away_team}:")
-    st.dataframe(drop_reset_index(df_away))
+    st.markdown("---")
+    st.markdown("#### Análise de Gols no Primeiro Tempo (HT)",
+                unsafe_allow_html=True)
+
+    # Resultado final
+    resultado = dt.analisar_gol_ht_frequencia(df_home, df_away)
+
+    # Frequência Home
+    freq_home = dt.contar_frequencia_gols_HT_home(df_home)
+    gols_home = dt.contar_gols_HT_home(df_home)
+
+    # Frequência Away
+    freq_away = dt.contar_frequencia_gols_HT_away(df_away)
+    gols_away = dt.contar_gols_HT_away(df_away)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric(f"🏠 Frequência de Gols HT do {home_team}", f"{freq_home * 100:.2f}%")
+        st.write(f"Jogos com Gol HT: {gols_home}")
+
+    with col2:
+        st.metric(f"✈️ Frequência de Gols HT do {away_team}", f"{freq_away * 100:.2f}%")
+        st.write(f"Jogos com Gol HT: {gols_away}")
+
+    # Resultado final
+    st.markdown(f"#### {resultado}")
+    st.markdown("<br>", unsafe_allow_html=True)
 
     # filtro para exibir os últimos jogos (Home)
     df_home = df.iloc[0:num_jogos]

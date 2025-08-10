@@ -70,12 +70,6 @@ def extrair_dados(linhas):
 
     return pd.DataFrame(jogos)
 
-def home(home_team):
-    return home_team
-
-def away(away_team):
-    return away_team
-
 #funções para calcular as médias de gols
 def media_home_gols_feitos(df_home):
     media_gols_feitos = df_home["H_Gols_FT"].mean() if not df_home.empty else 0
@@ -153,3 +147,47 @@ def estimar_vencedor(df_home, df_away):
         vencedor = 'Empate'
 
     return vencedor, round(score_home, 2), round(score_away, 2), round(prob_home, 2), round(prob_away, 2), round(prob_draw, 2), round(odd_home, 2), round(odd_away, 2), round(odd_draw, 2)
+
+def contar_gols_HT_home(df_home):
+    jogos_com_gols = df_home[df_home["H_Gols_HT"] > 0].shape[0]
+    return jogos_com_gols
+
+def contar_gols_HT_away(df_away):
+    jogos_com_gols = df_away[df_away["A_Gols_HT"] > 0].shape[0]
+    return jogos_com_gols
+
+def contar_frequencia_gols_HT_home(df_home):
+    total_jogos = df_home.shape[0]
+    jogos_com_gols = df_home[df_home["H_Gols_HT"] > 0].shape[0]
+
+    if total_jogos == 0:
+        return 0.0
+
+    return jogos_com_gols / total_jogos
+
+def contar_frequencia_gols_HT_away(df_away):
+    total_jogos = df_away.shape[0]
+    jogos_com_gols = df_away[df_away["A_Gols_HT"] > 0].shape[0]
+
+    if total_jogos == 0:
+        return 0.0
+
+    return jogos_com_gols / total_jogos
+
+
+def analisar_gol_ht_frequencia(df_home, df_away):
+    freq_home_marca = contar_frequencia_gols_HT_home(df_home)
+    freq_away_sofre = contar_frequencia_gols_HT_away(df_away)
+
+    freq_home_sofre = contar_frequencia_gols_HT_away(df_home)
+    freq_away_marca = contar_frequencia_gols_HT_home(df_away)
+
+    cond1 = freq_home_marca > 0.7 and freq_away_sofre > 0.7
+    cond2 = freq_home_sofre > 0.7 and freq_away_marca > 0.7
+
+    if cond1 or cond2:
+        return "✅ Alta chance de gol no HT"
+    else:
+        return "⚠️ Probabilidade baixa ou moderada de gol no HT"
+
+
