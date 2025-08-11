@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 import data as dt
 import sidebar as sb
 
@@ -194,18 +195,31 @@ if not df.empty:
     st.markdown(f"#### {resultado}")
     st.markdown("---")
 
-    dt.analisar_mercados(df_home, df_away, num_jogos)
-
-    st.markdown("### 📈 Análise de Mercados", unsafe_allow_html=True)    
+    dt.analisar_mercados(df_home, df_away, num_jogos)    
     df_resultado = dt.analisar_mercados(df_home, df_away, num_jogos)
 
-    col1, col2, col3 = st.columns(3)
+    # Cartões separados
+    st.subheader("🎯 Probabilidades por Mercado")
+    cols = st.columns(len(df_resultado))
 
-    for i, col in enumerate([col1, col2, col3]):
+    for i, col in enumerate(cols):
         mercado = df_resultado.iloc[i]
-        col.metric(label=mercado["Mercado"],
-                value=f'{mercado["Probabilidade (%)"]:.2f}%',
-                delta=f'Odd Justa: {mercado["Odd Justa"]:.2f}')
+        col.metric(
+            label=mercado["Mercado"],
+            value=f'{mercado["Probabilidade (%)"]}%',
+            delta=f'Odd Justa: {mercado["Odd Justa"]}'
+        )
+
+    # Gráfico de barras
+    st.subheader("📈 Visualização Gráfica")
+    chart = alt.Chart(df_resultado).mark_bar().encode(
+        x=alt.X('Mercado', sort=None),
+        y='Probabilidade (%)',
+        color='Mercado',
+        tooltip=['Mercado', 'Probabilidade (%)', 'Odd Justa']
+    ).properties(width=700, height=400)
+
+    st.altair_chart(chart, use_container_width=True)
 
     # filtro para exibir os últimos jogos (Home)
     df_home = df.iloc[0:num_jogos]
