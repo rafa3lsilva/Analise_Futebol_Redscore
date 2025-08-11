@@ -4,7 +4,7 @@ import streamlit as st
 def sidebar():
     st.sidebar.header("📊 Análise de Jogos de Futebol")
     # Tutorial
-    tutorial_url = "https://www.notion.so/Tutorial-Flashscore-2484bab1283b80f4b051e65d782a19d5?source=copy_link"
+    tutorial_url = "https://redscores.com/pt-br/"
 
     st.sidebar.markdown(f"""
         <div style="text-align: center; font-size: 16px;">
