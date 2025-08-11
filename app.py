@@ -218,8 +218,36 @@ if not df.empty:
         color='Mercado',
         tooltip=['Mercado', 'Probabilidade (%)', 'Odd Justa']
     ).properties(width=700, height=400)
-
     st.altair_chart(chart, use_container_width=True)
+    st.markdown("---")
+    
+    st.markdown("### 📊 Estimativa de Escanteios", unsafe_allow_html=True)
+    resultado = dt.estimar_linha_escanteios(df_home, df_away, num_jogos)
+    # Exibe métricas principais
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("📊 Mandante", round(resultado['Escanteios Mandante'], 2))
+    with col2:
+        st.metric("📊 Visitante", round(resultado['Escanteios Visitante'], 2))
+    with col3:
+        st.metric("📈 Total Ajustado", round(
+            resultado['Escanteios Totais Ajustados'], 2))
+    with col4:
+        st.metric("📌 Linha Sugerida", resultado['Linha Sugerida'])
+
+    # Probabilidade e odd justa
+    prob = resultado.get('Probabilidade Over', 0.0)
+    odd_justa = round(1 / prob, 2) if prob > 0 else "N/A"
+
+    valor_msg = "✅ Valor detectado!" if float(
+        resultado['Odd Justa']) < 1.80 else "⚠️ Sem valor claro no momento."
+
+    # Estilização com markdown
+    st.markdown(f"""
+    ### 🎯 Projeção de Mercado
+    - **Probabilidade de Over {resultado['Linha Sugerida']}**: `{resultado['Probabilidade']}%`  - **Odd Justa**: `{resultado['Odd Justa']}` - {valor_msg}
+    """)
+    st.markdown("---")
 
     # filtro para exibir os últimos jogos (Home)
     df_home = df.iloc[0:num_jogos]
