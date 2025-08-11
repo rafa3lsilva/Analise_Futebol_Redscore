@@ -1,6 +1,13 @@
 import pandas as pd
 import re
 
+
+def drop_reset_index(df):
+    df = df.dropna()
+    df = df.reset_index(drop=True)
+    df.index += 1
+    return df
+
 # Função para extrair os dados
 def extrair_dados(linhas):
     if not linhas:
@@ -191,3 +198,68 @@ def analisar_gol_ht_frequencia(df_home, df_away):
         return "⚠️ Probabilidade baixa ou moderada de gol no HT"
 
 
+def contar_over_1_5(df_home, df_away):
+    jogos_com_over = df_home[(df_home["H_Gols_FT"] + df_home["A_Gols_FT"]) > 1].shape[0]
+    total_jogos = df_home.shape[0]
+    return jogos_com_over / total_jogos if total_jogos > 0 else 0.0
+
+
+def contar_over_2_5(df_home, df_away):
+    jogos_com_over = df_home[(df_home["H_Gols_FT"] + df_home["A_Gols_FT"]) > 2].shape[0]
+    total_jogos = df_home.shape[0]
+    return jogos_com_over / total_jogos if total_jogos > 0 else 0.0
+
+
+def contar_btts(df_home, df_away):
+    jogos_com_btts = df_home[(df_home["H_Gols_FT"] > 0) & (df_home["A_Gols_FT"] > 0)].shape[0]
+    total_jogos = df_home.shape[0]
+    return jogos_com_btts / total_jogos if total_jogos > 0 else 0.0
+
+
+def analisar_mercados(df_home, df_away, num_jogos, suavizar=True):
+    import pandas as pd
+
+    # Filtrar os últimos jogos
+    df_home_filtrado = df_home.tail(num_jogos)
+    df_away_filtrado = df_away.tail(num_jogos)
+
+    # Unir os dois DataFrames
+    df_total = pd.concat(
+        [df_home_filtrado, df_away_filtrado], ignore_index=True)
+    total_jogos = df_total.shape[0]
+
+    # Funções auxiliares
+    def contar_prob(sucessos, total):
+        return (sucessos + 1) / (total + 2) if suavizar else sucessos / total if total > 0 else 0.0
+
+    def odd_justa(prob):
+        return round(1 / prob, 2) if prob > 0 else 0.0
+
+    # Contagem de eventos
+    over_1_5 = df_total[(df_total["H_Gols_FT"] +
+                         df_total["A_Gols_FT"]) > 1].shape[0]
+    over_2_5 = df_total[(df_total["H_Gols_FT"] +
+                         df_total["A_Gols_FT"]) > 2].shape[0]
+    btts = df_total[(df_total["H_Gols_FT"] > 0) & (
+        df_total["A_Gols_FT"] > 0)].shape[0]
+
+    # Cálculo
+    mercados = {
+        "Over 1.5": over_1_5,
+        "Over 2.5": over_2_5,
+        "BTTS": btts
+    }
+
+    painel = []
+    for nome, sucessos in mercados.items():
+        prob = contar_prob(sucessos, total_jogos)
+        odd = odd_justa(prob)
+        painel.append({
+            "Mercado": nome,
+            "Jogos com evento": sucessos,
+            "Total analisado": total_jogos,
+            "Probabilidade (%)": round(prob * 100, 1),
+            "Odd Justa": odd
+        })
+
+    return drop_reset_index(pd.DataFrame(painel))

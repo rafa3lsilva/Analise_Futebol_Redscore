@@ -192,7 +192,20 @@ if not df.empty:
 
     # Resultado final
     st.markdown(f"#### {resultado}")
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    dt.analisar_mercados(df_home, df_away, num_jogos)
+
+    st.markdown("### 📈 Análise de Mercados", unsafe_allow_html=True)    
+    df_resultado = dt.analisar_mercados(df_home, df_away, num_jogos)
+
+    col1, col2, col3 = st.columns(3)
+
+    for i, col in enumerate([col1, col2, col3]):
+        mercado = df_resultado.iloc[i]
+        col.metric(label=mercado["Mercado"],
+                value=f'{mercado["Probabilidade (%)"]:.2f}%',
+                delta=f'Odd Justa: {mercado["Odd Justa"]:.2f}')
 
     # filtro para exibir os últimos jogos (Home)
     df_home = df.iloc[0:num_jogos]
