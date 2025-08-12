@@ -3,6 +3,10 @@ import pandas as pd
 import altair as alt
 import data as dt
 import sidebar as sb
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def drop_reset_index(df):
     df = df.dropna()
@@ -118,14 +122,50 @@ if not df.empty:
         )
         num_jogos = int(intervalo.split()[1])
 
-
     # Aplica o intervalo nos DataFrames
-    df_home = df.iloc[0:num_jogos]
-    df_away = df.iloc[12:12 + num_jogos]
+    n = df.shape[0] // 2
+    df_home = df.iloc[:n].copy()
+    df_away = df.iloc[n:].copy()
 
-    home_team = df_home["Home"].unique()[0] if not df_home.empty else 'Home'
-    # Pega o primeiro valor único da coluna "Away" que seja diferente do "Home"
-    away_team = df_away["Away"].unique()[0] if not df_away.empty else 'Away'
+    # Garantir que são DataFrames
+    if not isinstance(df_home, pd.DataFrame):
+        raise TypeError(f"df_home não é DataFrame, é {type(df_home).__name__}")
+    if not isinstance(df_away, pd.DataFrame):
+        raise TypeError(f"df_away não é DataFrame, é {type(df_away).__name__}")
+
+    # Resetar índice para preservar ordem original do arquivo
+    df_home = df_home.reset_index(drop=True)
+    df_away = df_away.reset_index(drop=True)
+
+    # Criar coluna temporária para manter a ordem original
+    df_home["_ordem"] = df_home.index
+    df_away["_ordem"] = df_away.index
+
+    # Ordenar por time e ordem original
+    df_home = df_home.sort_values(["Home", "_ordem"], ascending=[True, True])
+    df_away = df_away.sort_values(["Away", "_ordem"], ascending=[True, True])
+
+    # Remover coluna auxiliar
+    df_home = df_home.drop(columns="_ordem")
+    df_away = df_away.drop(columns="_ordem")
+
+    # Ajusta num_jogos se for maior que o disponível
+    max_home = df_home.groupby("Home").size().min()
+    max_away = df_away.groupby("Away").size().min()
+    if num_jogos > max_home or num_jogos > max_away:
+        logger.warning(
+            f"Intervalo solicitado ({num_jogos}) é maior que o disponível "
+            f"({max_home} home / {max_away} away). Ajustando."
+        )
+        num_jogos = min(num_jogos, max_home, max_away)
+
+    # Filtra para manter apenas os primeiros `num_jogos` de cada time
+    df_home = df_home.groupby("Home", group_keys=False).head(num_jogos)
+    df_away = df_away.groupby("Away", group_keys=False).head(num_jogos)
+
+    # Nomes dos times
+    home_team = df_home["Home"].iloc[0] if not df_home.empty else "Home"
+    away_team = df_away["Away"].iloc[0] if not df_away.empty else "Away"
 
     # Exibe o confronto atual
     sb.confronto_atual(home_team, away_team)
