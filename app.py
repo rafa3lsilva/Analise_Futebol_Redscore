@@ -164,6 +164,27 @@ if not df.empty:
     # Exibe o confronto atual
     sb.confronto_atual(home_team, away_team)
 
+    with st.sidebar.expander("⚙️ Ajustar Pesos do Modelo"):
+        st.markdown(
+            "Ajuste a importância de cada atributo para o cálculo do vencedor.")
+        peso_ataques = st.slider("Peso dos Ataques", 0.0, 1.0, 0.2)
+        peso_chutes = st.slider("Peso dos Chutes", 0.0, 1.0, 0.3)
+        peso_chutes_gol = st.slider("Peso dos Chutes a Gol", 0.0, 2.0, 0.5)
+        peso_gols = st.slider("Peso dos Gols", 0.0, 3.0, 1.5)
+        peso_eficiencia = st.slider("Peso da Eficiência (%)", 0.0, 5.0, 2.0)
+        fator_casa = st.slider("Fator Casa (Multiplicador)",
+                            1.0, 1.5, 1.05)  # Alterado para multiplicador
+
+        # Crie o dicionário de pesos
+        pesos_modelo = {
+            'ataques': peso_ataques,
+            'chutes': peso_chutes,
+            'chutes_gol': peso_chutes_gol,
+            'gols': peso_gols,
+            'eficiencia': peso_eficiencia,
+            'fator_casa': fator_casa
+        }
+
     # Exibe as médias de gols
     media_home_gols_marcados = dt.media_home_gols_feitos(df_home)
     media_home_gols_sofridos = dt.media_home_gols_sofridos(df_home)
@@ -205,7 +226,7 @@ if not df.empty:
 
     # Calcula os dados
     vencedor, score_home, score_away, prob_home, prob_away, prob_draw, odd_home, odd_away, odd_draw = dt.estimar_vencedor(
-        df_home, df_away)
+        df_home, df_away, pesos_modelo)
 
     if vencedor == 'home':
         vencedor = home_team
@@ -232,13 +253,55 @@ if not df.empty:
         st.metric("Probabilidade de Vitória", f"{prob_home}%")
         st.metric("Odds Justas", f"{odd_home:.2f}")
     with col2:
+        st.markdown("### ⚖️ Empate")
+        st.metric("Probabilidade de Empate", f"{prob_draw}%")
+        st.metric("Odds Justas", f"{odd_draw:.2f}")
+    with col3:
         st.markdown(f"### ✈️ {away_team}")
         st.metric("Probabilidade de Vitória", f"{prob_away}%")
         st.metric("Odds Justas", f"{odd_away:.2f}")
-    with col3:
-        st.markdown("### ⚖️ Empate")
-        st.metric("Probabilidade de Empate", f"{prob_draw}%")
-        st.metric("Odds Justas", f"{odd_draw:.2f}")        
+    
+
+    st.markdown("---")
+    st.subheader("🔍 Comparador de Valor (Value Bet)")
+    st.write("Insira as odds do mercado para comparar com as odds justas calculadas pelo modelo.")
+
+    # Criar colunas para os inputs
+    col_val1, col_val2, col_val3 = st.columns(3)
+
+    with col_val1:
+        odd_mercado_home = st.number_input(
+            f"Odd Mercado para {home_team}", min_value=1.00, value=odd_home, step=0.01)
+    with col_val2:
+        odd_mercado_draw = st.number_input(
+            "Odd Mercado para Empate", min_value=1.00, value=odd_draw, step=0.01)
+    with col_val3:
+        odd_mercado_away = st.number_input(
+            f"Odd Mercado para {away_team}", min_value=1.00, value=odd_away, step=0.01)
+
+    # Lógica para exibir se há valor
+    with col_val1:
+        if odd_mercado_home > odd_home:
+            valor_home = (odd_mercado_home / odd_home - 1) * 100
+            st.success(f"✅ Valor Encontrado: +{valor_home:.2f}%")
+        else:
+            st.warning("Sem valor aparente.")
+
+    with col_val2:
+        if odd_mercado_draw > odd_draw:
+            valor_draw = (odd_mercado_draw / odd_draw - 1) * 100
+            st.success(f"✅ Valor Encontrado: +{valor_draw:.2f}%")
+        else:
+            st.warning("Sem valor aparente.")
+
+    with col_val3:
+        if odd_mercado_away > odd_away:
+            valor_away = (odd_mercado_away / odd_away - 1) * 100
+            st.success(f"✅ Valor Encontrado: +{valor_away:.2f}%")
+        else:
+            st.warning("Sem valor aparente.")
+
+    st.markdown("---")
 
     st.write(f"{home_team} - Pontuação Ofensiva",
              f"{score_home}", " -- Taxa de Vitórias", f"{tx_vitoria:.2f}%")

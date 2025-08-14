@@ -98,7 +98,9 @@ def media_away_gols_sofridos(df_away):
     return media_gols_sofridos
 
 #estimar vencedor da partida
-def estimar_vencedor(df_home, df_away):
+
+
+def estimar_vencedor(df_home, df_away, pesos):
     home_jogos = df_home.shape[0]
     away_jogos = df_away.shape[0]
 
@@ -117,9 +119,21 @@ def estimar_vencedor(df_home, df_away):
     home_eficiencia = (home_chutes_gol / home_chutes * 100) if home_chutes > 0 else 0
     away_eficiencia = (away_chutes_gol / away_chutes * 100) if away_chutes > 0 else 0
 
-    score_home = (home_ataques * 0.2 + home_chutes * 0.3 + home_chutes_gol * 0.5 + media_home_gols * 1.5 + home_eficiencia * 2)
-    score_away = (away_ataques * 0.2 + away_chutes * 0.3 + away_chutes_gol * 0.5 + media_away_gols * 1.5 + away_eficiencia * 2)
-    score_home += 1
+    # Pesos recebidos por parâmetro
+    score_home = (home_ataques * pesos['ataques'] +
+                  home_chutes * pesos['chutes'] +
+                  home_chutes_gol * pesos['chutes_gol'] +
+                  media_home_gols * pesos['gols'] +
+                  home_eficiencia * pesos['eficiencia'])
+    
+    score_away = (away_ataques * pesos['ataques'] +
+                  away_chutes * pesos['chutes'] +
+                  away_chutes_gol * pesos['chutes_gol'] +
+                  media_away_gols * pesos['gols'] +
+                  away_eficiencia * pesos['eficiencia'])
+    
+    # Fator casa recebido por parâmetro
+    score_home *= pesos['fator_casa']
 
     empates_home = (df_home["H_Gols_FT"] == df_home["A_Gols_FT"]).sum()
     empates_away = (df_away["H_Gols_FT"] == df_away["A_Gols_FT"]).sum()
