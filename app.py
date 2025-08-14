@@ -8,12 +8,6 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def drop_reset_index(df):
-    df = df.dropna()
-    df = df.reset_index(drop=True)
-    df.index += 1
-    return df
-
 # Função para configurar a página Streamlit
 st.set_page_config(
     page_title="Análise Futebol",
@@ -336,8 +330,8 @@ if not df.empty:
 
     # filtro para exibir os últimos jogos (Home)
     st.write(f"### Últimos {num_jogos} jogos do {home_team}:")
-    st.dataframe(drop_reset_index(df_home))
+    st.dataframe(dt.drop_reset_index(df_home))
 
     # filtro para exibir os últimos jogos (Away)
     st.write(f"### Últimos {num_jogos} jogos do {away_team}:")
-    st.dataframe(drop_reset_index(df_away))
+    st.dataframe(dt.drop_reset_index(df_away))

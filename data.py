@@ -1,6 +1,7 @@
 import pandas as pd
 import re
 from scipy.stats import poisson
+import logging
 
 def drop_reset_index(df):
     df = df.dropna()
@@ -72,7 +73,9 @@ def extrair_dados(linhas):
                 i += 6
             else:
                 i += 1
-        except:
+        except (ValueError, IndexError, TypeError) as e:  
+            logging.warning(
+                f"Erro ao processar uma linha de jogo: {e}. Pulando para a próxima.")
             i += 1
 
     return pd.DataFrame(jogos)
