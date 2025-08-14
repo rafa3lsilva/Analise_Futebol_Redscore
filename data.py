@@ -10,17 +10,27 @@ def drop_reset_index(df):
     return df
 
 # Função para extrair os dados
+
+
 def extrair_dados(linhas):
     if not linhas:
-        return pd.DataFrame()  # Retorna DataFrame vazio se linhas for None ou lista vazia
+        return pd.DataFrame()
 
     jogos = []
     i = 0
 
+    # Adicione uma lista de palavras-chave para identificar uma linha de liga
+    palavras_chave_liga = ["League", "Cup", "Championship", "Serie", "CAF"]
+
     while i < len(linhas) - 5:
         try:
-            if "League" in linhas[i] or "Championship" in linhas[i] or "Serie" in linhas[i]:
-                liga = linhas[i]
+            # Verifica se alguma das palavras-chave está na linha
+            if any(palavra in linhas[i] for palavra in palavras_chave_liga):
+
+                # --- PRIMEIRA MUDANÇA: Limpar o nome da liga ---
+                # Remove o padrão de data (ex: "29.8 ") do início da string
+                liga = re.sub(r'^\d+\.\d+\s*', '', linhas[i]).strip()
+
                 home = linhas[i+1]
                 placar_ft = re.search(r"(\d+)\s*-\s*(\d+)", linhas[i+3])
                 away = linhas[i+4]
@@ -50,7 +60,9 @@ def extrair_dados(linhas):
                         break
 
                 if placar_ft and odds:
+                    # --- SEGUNDA MUDANÇA: Adicionar a "Liga" ao dicionário ---
                     jogos.append({
+                        "Liga": liga,  # <--- NOVA LINHA ADICIONADA
                         "Home": home,
                         "Away": away,
                         "H_Gols_FT": int(placar_ft.group(1)),
@@ -73,9 +85,7 @@ def extrair_dados(linhas):
                 i += 6
             else:
                 i += 1
-        except (ValueError, IndexError, TypeError) as e:  
-            logging.warning(
-                f"Erro ao processar uma linha de jogo: {e}. Pulando para a próxima.")
+        except (ValueError, IndexError, TypeError) as e:
             i += 1
 
     return pd.DataFrame(jogos)

@@ -430,4 +430,4 @@ if not df.empty:
     st.write(f"### Últimos {num_jogos} jogos do {away_team}:")
     st.dataframe(dt.drop_reset_index(df_away))
 
-    st.write(df)
+    st.write(dt.drop_reset_index(df))
