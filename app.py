@@ -164,6 +164,7 @@ if not df.empty:
     # Exibe o confronto atual
     sb.confronto_atual(home_team, away_team)
 
+    st.sidebar.markdown("<br>",unsafe_allow_html=True)
     with st.sidebar.expander("⚙️ Ajustar Pesos do Modelo"):
         st.markdown(
             "Ajuste a importância de cada atributo para o cálculo do vencedor.")
@@ -210,9 +211,8 @@ if not df.empty:
             <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_away_gols_marcados:.2f}</strong></p>
             <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_away_gols_sofridos:.2f}</strong></p>
         </div>
+        <br>
         """, unsafe_allow_html=True)
-
-    st.markdown('<br>', unsafe_allow_html=True)
 
     # Taxa de Vitórias home
     df_home['resultado'] = df_home['H_Gols_FT'] > df_home['A_Gols_FT']
@@ -252,6 +252,8 @@ if not df.empty:
         st.markdown(f"### 🏠 {home_team}")
         st.metric("Probabilidade de Vitória", f"{prob_home}%")
         st.metric("Odds Justas", f"{odd_home:.2f}")
+        st.write("Pontuação Ofensiva",f"{score_home}")
+        st.write("Taxa de Vitórias", f"{tx_vitoria:.2f}%")
     with col2:
         st.markdown("### ⚖️ Empate")
         st.metric("Probabilidade de Empate", f"{prob_draw}%")
@@ -260,8 +262,9 @@ if not df.empty:
         st.markdown(f"### ✈️ {away_team}")
         st.metric("Probabilidade de Vitória", f"{prob_away}%")
         st.metric("Odds Justas", f"{odd_away:.2f}")
+        st.write("Pontuação Ofensiva", f"{score_away}")
+        st.write("Taxa de Vitórias", f"{tx_vitoria_away:.2f}%")
     
-
     st.markdown("---")
     st.subheader("🔍 Comparador de Valor (Value Bet)")
     st.write("Insira as odds do mercado para comparar com as odds justas calculadas pelo modelo.")
@@ -300,14 +303,6 @@ if not df.empty:
             st.success(f"✅ Valor Encontrado: +{valor_away:.2f}%")
         else:
             st.warning("Sem valor aparente.")
-
-    st.markdown("---")
-
-    st.write(f"{home_team} - Pontuação Ofensiva",
-             f"{score_home}", " -- Taxa de Vitórias", f"{tx_vitoria:.2f}%")
-
-    st.write(f"{away_team} - Pontuação Ofensiva",
-             f"{score_away}", " -- Taxa de Vitórias", f"{tx_vitoria_away:.2f}%")
 
     st.markdown("---")
     st.markdown("#### Análise de Gols no Primeiro Tempo (HT)",

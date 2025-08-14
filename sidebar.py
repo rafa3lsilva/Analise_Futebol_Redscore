@@ -32,4 +32,3 @@ def confronto_atual(home_team, away_team):
                 </div>
             </div>
         """, unsafe_allow_html=True)
-st.sidebar.markdown("<br>", unsafe_allow_html=True)
