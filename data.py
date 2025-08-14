@@ -11,7 +11,6 @@ def drop_reset_index(df):
 
 # Função para extrair os dados
 
-
 def extrair_dados(linhas):
     if not linhas:
         return pd.DataFrame()
@@ -27,7 +26,7 @@ def extrair_dados(linhas):
             # Verifica se alguma das palavras-chave está na linha
             if any(palavra in linhas[i] for palavra in palavras_chave_liga):
 
-                # --- PRIMEIRA MUDANÇA: Limpar o nome da liga ---
+                # --- Limpar o nome da liga ---
                 # Remove o padrão de data (ex: "29.8 ") do início da string
                 liga = re.sub(r'^\d+\.\d+\s*', '', linhas[i]).strip()
 
@@ -60,9 +59,8 @@ def extrair_dados(linhas):
                         break
 
                 if placar_ft and odds:
-                    # --- SEGUNDA MUDANÇA: Adicionar a "Liga" ao dicionário ---
                     jogos.append({
-                        "Liga": liga,  # <--- NOVA LINHA ADICIONADA
+                        "Liga": liga,
                         "Home": home,
                         "Away": away,
                         "H_Gols_FT": int(placar_ft.group(1)),
@@ -87,7 +85,6 @@ def extrair_dados(linhas):
                 i += 1
         except (ValueError, IndexError, TypeError) as e:
             i += 1
-
     return pd.DataFrame(jogos)
 
 #funções para calcular as médias de gols
@@ -108,8 +105,6 @@ def media_away_gols_sofridos(df_away):
     return media_gols_sofridos
 
 #estimar vencedor da partida
-
-
 def estimar_vencedor(df_home, df_away, pesos):
     home_jogos = df_home.shape[0]
     away_jogos = df_away.shape[0]
@@ -346,14 +341,10 @@ def analisar_mercados(df_home, df_away, num_jogos, suavizar=True):
 
 
 # Função para calcular média segura
-
-
 def safe_mean(df, col):
     return df[col].mean() if col in df.columns else 0.0
 
 # Função para calcular estatísticas dos times
-
-
 def calc_stats(df):
     return {
         'esc_feitos_mean': safe_mean(df, 'H_Escanteios'),
@@ -364,8 +355,6 @@ def calc_stats(df):
     }
 
 # Função para calcular probabilidade de bater o over usando Poisson
-
-
 def probabilidade_poisson_over(media_esperada, linha_str):
     try:
         linha_num = float(linha_str.split()[-1])  # Ex: 'Over 10.5' → 10.5
@@ -376,8 +365,6 @@ def probabilidade_poisson_over(media_esperada, linha_str):
         return 0.0
 
 # Função principal
-
-
 def estimar_linha_escanteios(df_home, df_away, num_jogos):
     # Filtra os últimos jogos
     df_home_last = df_home.tail(num_jogos)

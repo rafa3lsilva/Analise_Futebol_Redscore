@@ -106,16 +106,15 @@ if not df.empty:
     """, unsafe_allow_html=True)
 
 if not df.empty:
-
-    # --- Bloco de Filtros da Sidebar (VERSÃO FINAL) ---
+    # --- Bloco de Filtros da Sidebar---
     st.sidebar.markdown("### Filtros da Análise")
 
-    # Filtros de Liga e Times (do Passo 2)
+    # Filtros de Liga e Times
     leagues = sorted(df['Liga'].unique())
     all_teams = sorted(pd.unique(df[['Home', 'Away']].values.ravel('K')))
 
     selected_league = st.sidebar.selectbox(
-        'Filtrar por Liga:', ['Todas'] + leagues)
+        'Filtrar Liga:', ['Todas'] + leagues)
 
     home_index = 0
     away_index = 1 if len(all_teams) > 1 else 0
@@ -124,8 +123,8 @@ if not df.empty:
     selected_away_team = st.sidebar.selectbox(
         'Time Visitante:', all_teams, index=away_index)
 
-    # NOVO: Filtro de Cenário (Passo 3)
-    selected_scenario = st.sidebar.selectbox(  # Trocado de st.radio para st.selectbox
+    # Filtro de Cenário
+    selected_scenario = st.sidebar.selectbox(
         'Cenário de Análise:',
         ['Geral', 'Casa/Fora'],
         help="Geral: analisa todos os jogos de cada time. Casa/Fora: analisa apenas jogos em casa do mandante e fora do visitante."
@@ -142,7 +141,7 @@ if not df.empty:
         df_filtrado_liga = df_filtrado_liga[df_filtrado_liga['Liga']
                                             == selected_league]
 
-    # LÓGICA ATUALIZADA: Cria os DataFrames com base no cenário escolhido
+    # Cria os DataFrames com base no cenário escolhido
     if selected_scenario == 'Geral':
         # Cenário Geral: Pega todos os jogos de cada time
         df_home_base = df_filtrado_liga[(df_filtrado_liga['Home'] == selected_home_team) | (
@@ -156,24 +155,18 @@ if not df.empty:
         df_away_base = df_filtrado_liga[df_filtrado_liga['Away']
                                         == selected_away_team].copy().reset_index(drop=True)
 
-
     # --- 2. FILTRO DE INTERVALO DE JOGOS (ÚLTIMOS N JOGOS) ---
     with st.container():
         st.markdown("### 📅 Intervalo de Jogos")
         intervalo = st.radio(
             "",
             options=["Últimos 5 jogos", "Últimos 8 jogos",
-                     "Últimos 10 jogos", "Últimos 12 jogos", "Todos"],
-            index=2,  # Padrão para 10 jogos
+                     "Últimos 10 jogos", "Últimos 12 jogos"],
+            index=2,
             horizontal=True
         )
+    num_jogos_selecionado = int(intervalo.split()[1])
 
-    if intervalo == "Todos":
-        num_jogos_selecionado = len(df)  # Um número grande para pegar todos
-    else:
-        num_jogos_selecionado = int(intervalo.split()[1])
-
-    # --- 3. PREPARAÇÃO FINAL DOS DADOS PARA ANÁLISE ---
     # Ajusta o número de jogos se o usuário pedir mais do que o disponível
     num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
     num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
@@ -446,5 +439,3 @@ if not df.empty:
     # filtro para exibir os últimos jogos (Away)
     st.write(f"### Últimos {num_jogos_selecionado} jogos do {away_team}:")
     st.dataframe(dt.drop_reset_index(df_away))
-
-    st.write(dt.drop_reset_index(df))
