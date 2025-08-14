@@ -105,77 +105,92 @@ if not df.empty:
     </style>
     """, unsafe_allow_html=True)
 
+if not df.empty:
+
+    # --- Bloco de Filtros da Sidebar (VERSÃO FINAL) ---
+    st.sidebar.markdown("### Filtros da Análise")
+
+    # Filtros de Liga e Times (do Passo 2)
+    leagues = sorted(df['Liga'].unique())
+    all_teams = sorted(pd.unique(df[['Home', 'Away']].values.ravel('K')))
+
+    selected_league = st.sidebar.selectbox(
+        'Filtrar por Liga:', ['Todas'] + leagues)
+
+    home_index = 0
+    away_index = 1 if len(all_teams) > 1 else 0
+    selected_home_team = st.sidebar.selectbox(
+        'Time da Casa:', all_teams, index=home_index)
+    selected_away_team = st.sidebar.selectbox(
+        'Time Visitante:', all_teams, index=away_index)
+
+    # NOVO: Filtro de Cenário (Passo 3)
+    selected_scenario = st.sidebar.selectbox(  # Trocado de st.radio para st.selectbox
+        'Cenário de Análise:',
+        ['Geral', 'Casa/Fora'],
+        help="Geral: analisa todos os jogos de cada time. Casa/Fora: analisa apenas jogos em casa do mandante e fora do visitante."
+    )
+
+    # Validação para garantir que os times selecionados não sejam iguais
+    if selected_home_team == selected_away_team:
+        st.sidebar.error("O time da casa e o visitante não podem ser iguais.")
+        st.stop()
+
+    # Filtra o DataFrame principal pela liga selecionada
+    df_filtrado_liga = df.copy()
+    if selected_league != 'Todas':
+        df_filtrado_liga = df_filtrado_liga[df_filtrado_liga['Liga']
+                                            == selected_league]
+
+    # LÓGICA ATUALIZADA: Cria os DataFrames com base no cenário escolhido
+    if selected_scenario == 'Geral':
+        # Cenário Geral: Pega todos os jogos de cada time
+        df_home_base = df_filtrado_liga[(df_filtrado_liga['Home'] == selected_home_team) | (
+            df_filtrado_liga['Away'] == selected_home_team)].copy().reset_index(drop=True)
+        df_away_base = df_filtrado_liga[(df_filtrado_liga['Home'] == selected_away_team) | (
+            df_filtrado_liga['Away'] == selected_away_team)].copy().reset_index(drop=True)
+    else:  # Cenário 'Casa/Fora'
+        # Cenário Específico: Pega apenas jogos em casa do mandante e fora do visitante
+        df_home_base = df_filtrado_liga[df_filtrado_liga['Home']
+                                        == selected_home_team].copy().reset_index(drop=True)
+        df_away_base = df_filtrado_liga[df_filtrado_liga['Away']
+                                        == selected_away_team].copy().reset_index(drop=True)
+
+
+    # --- 2. FILTRO DE INTERVALO DE JOGOS (ÚLTIMOS N JOGOS) ---
     with st.container():
         st.markdown("### 📅 Intervalo de Jogos")
         intervalo = st.radio(
             "",
             options=["Últimos 5 jogos", "Últimos 8 jogos",
-                    "Últimos 10 jogos", "Últimos 12 jogos"],
-            index=0,
+                     "Últimos 10 jogos", "Últimos 12 jogos", "Todos"],
+            index=2,  # Padrão para 10 jogos
             horizontal=True
         )
-        num_jogos = int(intervalo.split()[1])
 
-    # Aplica o intervalo nos DataFrames
-    if not df.empty:
-            # 1. Identifica o primeiro time mandante no arquivo
-        time_principal_home = df['Home'].iloc[0]
-
-        # 2. Cria o df_home com todos os jogos desse time como mandante
-        df_home = df[df['Home'] ==
-                    time_principal_home].copy().reset_index(drop=True)
-
-        # 3. Cria o df_away com todos os jogos do OUTRO time como mandante
-        df_away = df[df['Home'] !=
-                    time_principal_home].copy().reset_index(drop=True)
-
+    if intervalo == "Todos":
+        num_jogos_selecionado = len(df)  # Um número grande para pegar todos
     else:
-        # Garante que os dataframes não fiquem indefinidos se o df principal estiver vazio
-        df_home = pd.DataFrame()
-        df_away = pd.DataFrame()
+        num_jogos_selecionado = int(intervalo.split()[1])
 
-    # Garantir que são DataFrames
-    if not isinstance(df_home, pd.DataFrame):
-        raise TypeError(f"df_home não é DataFrame, é {type(df_home).__name__}")
-    if not isinstance(df_away, pd.DataFrame):
-        raise TypeError(f"df_away não é DataFrame, é {type(df_away).__name__}")
+    # --- 3. PREPARAÇÃO FINAL DOS DADOS PARA ANÁLISE ---
+    # Ajusta o número de jogos se o usuário pedir mais do que o disponível
+    num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
+    num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
 
-    # Resetar índice para preservar ordem original do arquivo
-    df_home = df_home.reset_index(drop=True)
-    df_away = df_away.reset_index(drop=True)
+    # Pega os N primeiros jogos (os mais recentes do arquivo) para a análise final
+    df_home = df_home_base.head(num_jogos_home)
+    df_away = df_away_base.head(num_jogos_away)
 
-    # Criar coluna temporária para manter a ordem original
-    df_home["_ordem"] = df_home.index
-    df_away["_ordem"] = df_away.index
+    # Define os nomes dos times para usar nos títulos das análises
+    home_team = selected_home_team
+    away_team = selected_away_team
 
-    # Ordenar por time e ordem original
-    df_home = df_home.sort_values(["Home", "_ordem"], ascending=[True, True])
-    df_away = df_away.sort_values(["Away", "_ordem"], ascending=[True, True])
-
-    # Remover coluna auxiliar
-    df_home = df_home.drop(columns="_ordem")
-    df_away = df_away.drop(columns="_ordem")
-
-    # Ajusta num_jogos se for maior que o disponível
-    max_home = df_home.groupby("Home").size().min()
-    max_away = df_away.groupby("Away").size().min()
-    if num_jogos > max_home or num_jogos > max_away:
-        logger.warning(
-            f"Intervalo solicitado ({num_jogos}) é maior que o disponível "
-            f"({max_home} home / {max_away} away). Ajustando."
-        )
-        num_jogos = min(num_jogos, max_home, max_away)
-
-    # Filtra para manter apenas os primeiros `num_jogos` de cada time
-    df_home = df_home.groupby("Home", group_keys=False).head(num_jogos)
-    df_away = df_away.groupby("Away", group_keys=False).head(num_jogos)
-
-    # Nomes dos times
-    home_team = df_home["Home"].iloc[0] if not df_home.empty else "Home"
-    away_team = df_away["Away"].iloc[0] if not df_away.empty else "Away"
-
-    # Exibe o confronto atual
-    sb.confronto_atual(home_team, away_team)
+    # Validação final para garantir que há dados para analisar
+    if df_home.empty or df_away.empty:
+        st.warning(
+            "Não há dados suficientes para a análise com os filtros selecionados. Por favor, ajuste as opções.")
+        st.stop()
 
     st.sidebar.markdown("<br>",unsafe_allow_html=True)
     with st.sidebar.expander("⚙️ Ajustar Pesos do Modelo"):
@@ -230,12 +245,12 @@ if not df.empty:
     # Taxa de Vitórias home
     df_home['resultado'] = df_home['H_Gols_FT'] > df_home['A_Gols_FT']
     vitoria = df_home[df_home['resultado'] == 1].shape[0]
-    tx_vitoria = (vitoria / num_jogos) * 100
+    tx_vitoria = (vitoria / num_jogos_selecionado) * 100
 
     # Taxa de Vitórias away
     df_away['resultado'] = df_away['A_Gols_FT'] > df_away['H_Gols_FT']
     vitoria_away = df_away[df_away['resultado'] == 1].shape[0]
-    tx_vitoria_away = (vitoria_away / num_jogos) * 100
+    tx_vitoria_away = (vitoria_away / num_jogos_selecionado) * 100
 
     # Calcula os dados
     vencedor, score_home, score_away, prob_home, prob_away, prob_draw, odd_home, odd_away, odd_draw = dt.estimar_vencedor(
@@ -369,7 +384,8 @@ if not df.empty:
 
     st.markdown("---")
     
-    df_resultado = dt.analisar_mercados(df_home, df_away, num_jogos)
+    df_resultado = dt.analisar_mercados(
+        df_home, df_away, num_jogos_selecionado)
 
     # Cartões separados
     st.subheader("🎯 Probabilidades por Mercado")
@@ -395,7 +411,8 @@ if not df.empty:
     st.markdown("---")
     
     st.markdown("### 📊 Estimativa de Escanteios", unsafe_allow_html=True)
-    resultado = dt.estimar_linha_escanteios(df_home, df_away, num_jogos)
+    resultado = dt.estimar_linha_escanteios(
+        df_home, df_away, num_jogos_selecionado)
     # Exibe métricas principais
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -423,11 +440,11 @@ if not df.empty:
     st.markdown("---")
 
     # filtro para exibir os últimos jogos (Home)
-    st.write(f"### Últimos {num_jogos} jogos do {home_team}:")
+    st.write(f"### Últimos {num_jogos_selecionado} jogos do {home_team}:")
     st.dataframe(dt.drop_reset_index(df_home))
 
     # filtro para exibir os últimos jogos (Away)
-    st.write(f"### Últimos {num_jogos} jogos do {away_team}:")
+    st.write(f"### Últimos {num_jogos_selecionado} jogos do {away_team}:")
     st.dataframe(dt.drop_reset_index(df_away))
 
     st.write(dt.drop_reset_index(df))
