@@ -117,9 +117,22 @@ if not df.empty:
         num_jogos = int(intervalo.split()[1])
 
     # Aplica o intervalo nos DataFrames
-    n = df.shape[0] // 2
-    df_home = df.iloc[:n].copy()
-    df_away = df.iloc[n:].copy()
+    if not df.empty:
+            # 1. Identifica o primeiro time mandante no arquivo
+        time_principal_home = df['Home'].iloc[0]
+
+        # 2. Cria o df_home com todos os jogos desse time como mandante
+        df_home = df[df['Home'] ==
+                    time_principal_home].copy().reset_index(drop=True)
+
+        # 3. Cria o df_away com todos os jogos do OUTRO time como mandante
+        df_away = df[df['Home'] !=
+                    time_principal_home].copy().reset_index(drop=True)
+
+    else:
+        # Garante que os dataframes não fiquem indefinidos se o df principal estiver vazio
+        df_home = pd.DataFrame()
+        df_away = pd.DataFrame()
 
     # Garantir que são DataFrames
     if not isinstance(df_home, pd.DataFrame):
@@ -305,34 +318,57 @@ if not df.empty:
             st.warning("Sem valor aparente.")
 
     st.markdown("---")
-    st.markdown("#### Análise de Gols no Primeiro Tempo (HT)",
+    st.markdown("#### Análise de Gol no Primeiro Tempo (HT)",
                 unsafe_allow_html=True)
+    analise_ht_nova = dt.analise_gol_ht(df_home, df_away)
 
-    # Resultado final
-    resultado = dt.analisar_gol_ht_frequencia(df_home, df_away)
+    # 2. Exibe o resultado principal da nova análise
+    st.markdown(f"##### {analise_ht_nova['conclusao']}")
 
-    # Frequência Home
-    freq_home = dt.contar_frequencia_gols_HT_home(df_home)
-    gols_home = dt.contar_gols_HT_home(df_home)
+    # Exibe a probabilidade e a odd justa, se aplicável
+    if analise_ht_nova['odd_justa'] > 0:
+        st.success(
+            f"Probabilidade Estimada (baseada nas médias): **{analise_ht_nova['probabilidade']:.1f}%**. "
+            f"Odd Justa Mínima: **{analise_ht_nova['odd_justa']:.2f}**"
+        )
 
-    # Frequência Away
-    freq_away = dt.contar_frequencia_gols_HT_away(df_away)
-    gols_away = dt.contar_gols_HT_away(df_away)
+    # Adiciona um expansor para mostrar os detalhes do cálculo
+    with st.expander("Ver detalhes do cálculo"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Média de Over 0.5 HT",
+                    f"{analise_ht_nova['media_05ht']:.1f}%")
+        with col2:
+            st.metric("Média de Over 1.5 FT",
+                    f"{analise_ht_nova['media_15ft']:.1f}%")
+        with col3:
+            st.metric("Média de Over 2.5 FT",
+                    f"{analise_ht_nova['media_25ft']:.1f}%")
+        st.caption("A probabilidade final é a média simples das três métricas acima.")
+
+    # --- Painel de Apoio
+    st.markdown(f"#### Estatísticas Individuais HT de {home_team} e {away_team}")
+
+    # Chama a função antiga para obter os dados de apoio
+    analise_ht_antiga = dt.analisar_gol_ht_home_away(df_home, df_away)
 
     col1, col2 = st.columns(2)
-
     with col1:
-        st.metric(f"🏠 Frequência de Gols HT do {home_team}", f"{freq_home * 100:.2f}%")
-        st.write(f"Jogos com Gol HT: {gols_home}")
+        st.markdown(f"**Análise de {home_team} (Casa):**")
+        st.info(
+            f"Marcou gol no HT em **{analise_ht_antiga['home_marca']:.1f}%** dos seus jogos em casa.")
+        st.warning(
+            f"Sofreu gol no HT em **{analise_ht_antiga['home_sofre']:.1f}%** dos seus jogos em casa.")
 
     with col2:
-        st.metric(f"✈️ Frequência de Gols HT do {away_team}", f"{freq_away * 100:.2f}%")
-        st.write(f"Jogos com Gol HT: {gols_away}")
+        st.markdown(f"**Análise de {away_team} (Fora):**")
+        st.info(
+            f"Marcou gol no HT em **{analise_ht_antiga['away_marca']:.1f}%** dos seus jogos fora.")
+        st.warning(
+            f"Sofreu gol no HT em **{analise_ht_antiga['away_sofre']:.1f}%** dos seus jogos fora.")
 
-    # Resultado final
-    st.markdown(f"#### {resultado}")
     st.markdown("---")
-   
+    
     df_resultado = dt.analisar_mercados(df_home, df_away, num_jogos)
 
     # Cartões separados
@@ -393,3 +429,5 @@ if not df.empty:
     # filtro para exibir os últimos jogos (Away)
     st.write(f"### Últimos {num_jogos} jogos do {away_team}:")
     st.dataframe(dt.drop_reset_index(df_away))
+
+    st.write(df)

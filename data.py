@@ -172,48 +172,101 @@ def estimar_vencedor(df_home, df_away, pesos):
 
     return vencedor, round(score_home, 2), round(score_away, 2), round(prob_home, 2), round(prob_away, 2), round(prob_draw, 2), round(odd_home, 2), round(odd_away, 2), round(odd_draw, 2)
 
-def contar_gols_HT_home(df_home):
-    jogos_com_gols = df_home[df_home["H_Gols_HT"] > 0].shape[0]
-    return jogos_com_gols
-
-def contar_gols_HT_away(df_away):
-    jogos_com_gols = df_away[df_away["A_Gols_HT"] > 0].shape[0]
-    return jogos_com_gols
-
-def contar_frequencia_gols_HT_home(df_home):
-    total_jogos = df_home.shape[0]
-    jogos_com_gols = df_home[df_home["H_Gols_HT"] > 0].shape[0]
-
+def contar_frequencia_gols_HT_home(df):
+    total_jogos = df.shape[0]
     if total_jogos == 0:
         return 0.0
-
+    jogos_com_gols = df[df["H_Gols_HT"] > 0].shape[0]
     return jogos_com_gols / total_jogos
 
-def contar_frequencia_gols_HT_away(df_away):
-    total_jogos = df_away.shape[0]
-    jogos_com_gols = df_away[df_away["A_Gols_HT"] > 0].shape[0]
-
+def contar_frequencia_gols_HT_away(df):
+    total_jogos = df.shape[0]
     if total_jogos == 0:
         return 0.0
-
+    jogos_com_gols = df[df["A_Gols_HT"] > 0].shape[0]
     return jogos_com_gols / total_jogos
 
-
-def analisar_gol_ht_frequencia(df_home, df_away):
+def analisar_gol_ht_home_away(df_home, df_away):
+    # 1. Calcula todas as frequências
     freq_home_marca = contar_frequencia_gols_HT_home(df_home)
     freq_away_sofre = contar_frequencia_gols_HT_away(df_away)
-
     freq_home_sofre = contar_frequencia_gols_HT_away(df_home)
-    freq_away_marca = contar_frequencia_gols_HT_home(df_away)
+    freq_away_marca = contar_frequencia_gols_HT_home(df_away)    
 
-    cond1 = freq_home_marca > 0.7 and freq_away_sofre > 0.7
-    cond2 = freq_home_sofre > 0.7 and freq_away_marca > 0.7
+    return {
+        "home_marca": freq_home_marca * 100,
+        "home_sofre": freq_home_sofre * 100,
+        "away_marca": freq_away_marca * 100,
+        "away_sofre": freq_away_sofre * 100,
+    }
 
-    if cond1 or cond2:
-        return "✅ Alta chance de gol no HT"
+def calcular_freq_over(df, limite_gols):
+    """Calcula a frequência de jogos acima de um limite de gols (FT)."""
+    total_jogos = df.shape[0]
+    if total_jogos == 0:
+        return 0.0
+
+    soma_gols = df['H_Gols_FT'] + df['A_Gols_FT']
+    jogos_over = df[soma_gols > limite_gols].shape[0]
+
+    return jogos_over / total_jogos
+
+def calcular_freq_over_ht(df):
+    """Calcula a frequência de jogos com mais de 0.5 gols (HT)."""
+    total_jogos = df.shape[0]
+    if total_jogos == 0:
+        return 0.0
+
+    soma_gols_ht = df['H_Gols_HT'] + df['A_Gols_HT']
+    jogos_over = df[soma_gols_ht > 0].shape[0]
+
+    return jogos_over / total_jogos
+
+def analise_gol_ht(df_home, df_away):
+    """
+    Calcula a probabilidade de gol no HT com base em uma média de mercados.
+    """
+    # 1. Calcula a frequência de cada mercado para cada time
+    home_05ht = calcular_freq_over_ht(df_home)
+    away_05ht = calcular_freq_over_ht(df_away)
+
+    home_15ft = calcular_freq_over(df_home, 1)
+    away_15ft = calcular_freq_over(df_away, 1)
+
+    home_25ft = calcular_freq_over(df_home, 2)
+    away_25ft = calcular_freq_over(df_away, 2)
+
+    # 2. Calcula a média combinada para cada mercado
+    media_05ht = (home_05ht + away_05ht) / 2
+    media_15ft = (home_15ft + away_15ft) / 2
+    media_25ft = (home_25ft + away_25ft) / 2
+
+    # 3. Calcula a média final ponderada
+    prob_final_estimada = (media_05ht + media_15ft + media_25ft) / 3
+
+    # 4. Define a conclusão e a odd justa com base na probabilidade final
+    conclusao = ""
+    odd_justa = 0
+
+    if prob_final_estimada >= 0.70:
+        conclusao = "✅ Probabilidade Alta de Gol HT"
+    elif prob_final_estimada <= 0.60:
+        conclusao = "⚠️ Probabilidade Baixa de Gol HT"
     else:
-        return "⚠️ Probabilidade baixa ou moderada de gol no HT"
+        conclusao = "🔎 Probabilidade Moderada de Gol HT"
 
+    if prob_final_estimada > 0:
+        odd_justa = 1 / prob_final_estimada
+
+    # 5. Retorna um dicionário com todos os resultados
+    return {
+        "conclusao": conclusao,
+        "probabilidade": prob_final_estimada * 100,
+        "odd_justa": odd_justa,
+        "media_05ht": media_05ht * 100,
+        "media_15ft": media_15ft * 100,
+        "media_25ft": media_25ft * 100,
+    }
 
 def contar_over_1_5(df_home, df_away):
     jogos_com_over = df_home[(df_home["H_Gols_FT"] + df_home["A_Gols_FT"]) > 1].shape[0]
