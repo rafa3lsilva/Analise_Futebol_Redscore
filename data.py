@@ -205,51 +205,38 @@ def analisar_gol_ht_home_away(df_home, df_away):
         "away_sofre": freq_away_sofre * 100,
     }
 
-def calcular_freq_over(df, limite_gols):
-    """Calcula a frequência de jogos acima de um limite de gols (FT)."""
-    total_jogos = df.shape[0]
-    if total_jogos == 0:
-        return 0.0
-
-    soma_gols = df['H_Gols_FT'] + df['A_Gols_FT']
-    jogos_over = df[soma_gols > limite_gols].shape[0]
-
-    return jogos_over / total_jogos
-
-def calcular_freq_over_ht(df):
-    """Calcula a frequência de jogos com mais de 0.5 gols (HT)."""
-    total_jogos = df.shape[0]
-    if total_jogos == 0:
-        return 0.0
-
-    soma_gols_ht = df['H_Gols_HT'] + df['A_Gols_HT']
-    jogos_over = df[soma_gols_ht > 0].shape[0]
-
-    return jogos_over / total_jogos
-
-def analise_gol_ht(df_home, df_away):
+def analise_gol_ht(df_home, df_away, suavizar=True):
     """
-    Calcula a probabilidade de gol no HT com base em uma média de mercados.
+    Calcula a probabilidade de gol no HT usando o método padronizado 
+    (dados combinados + suavização).
     """
-    # 1. Calcula a frequência de cada mercado para cada time
-    home_05ht = calcular_freq_over_ht(df_home)
-    away_05ht = calcular_freq_over_ht(df_away)
+    # 1. Unifica os DataFrames, assim como no Painel de Mercados
+    df_total = pd.concat([df_home, df_away], ignore_index=True)
+    total_jogos = df_total.shape[0]
 
-    home_15ft = calcular_freq_over(df_home, 1)
-    away_15ft = calcular_freq_over(df_away, 1)
+    # Função de suavização (a mesma do Painel de Mercados)
+    def contar_prob(sucessos, total):
+        if total == 0:
+            return 0.0
+        return (sucessos + 1) / (total + 2) if suavizar else sucessos / total
 
-    home_25ft = calcular_freq_over(df_home, 2)
-    away_25ft = calcular_freq_over(df_away, 2)
+    # 2. Conta os eventos (sucessos) para cada mercado no DataFrame unificado
+    over_05ht_sucessos = df_total[(
+        df_total['H_Gols_HT'] + df_total['A_Gols_HT']) > 0].shape[0]
+    over_15ft_sucessos = df_total[(
+        df_total['H_Gols_FT'] + df_total['A_Gols_FT']) > 1].shape[0]
+    over_25ft_sucessos = df_total[(
+        df_total['H_Gols_FT'] + df_total['A_Gols_FT']) > 2].shape[0]
 
-    # 2. Calcula a média combinada para cada mercado
-    media_05ht = (home_05ht + away_05ht) / 2
-    media_15ft = (home_15ft + away_15ft) / 2
-    media_25ft = (home_25ft + away_25ft) / 2
+    # 3. Calcula a probabilidade de cada mercado usando o método de suavização
+    prob_05ht = contar_prob(over_05ht_sucessos, total_jogos)
+    prob_15ft = contar_prob(over_15ft_sucessos, total_jogos)
+    prob_25ft = contar_prob(over_25ft_sucessos, total_jogos)
 
-    # 3. Calcula a média final ponderada
-    prob_final_estimada = (media_05ht + media_15ft + media_25ft) / 3
+    # 4. Calcula a média final das probabilidades, como na regra original
+    prob_final_estimada = (prob_05ht + prob_15ft + prob_25ft) / 3
 
-    # 4. Define a conclusão e a odd justa com base na probabilidade final
+    # 5. Define a conclusão e a odd justa
     conclusao = ""
     odd_justa = 0
 
@@ -263,16 +250,15 @@ def analise_gol_ht(df_home, df_away):
     if prob_final_estimada > 0:
         odd_justa = 1 / prob_final_estimada
 
-    # 5. Retorna um dicionário com todos os resultados
+    # 6. Retorna o dicionário com todos os resultados
     return {
         "conclusao": conclusao,
         "probabilidade": prob_final_estimada * 100,
         "odd_justa": odd_justa,
-        "media_05ht": media_05ht * 100,
-        "media_15ft": media_15ft * 100,
-        "media_25ft": media_25ft * 100,
+        "media_05ht": prob_05ht * 100,
+        "media_15ft": prob_15ft * 100,
+        "media_25ft": prob_25ft * 100,
     }
-
 
 def analisar_mercados(df_home, df_away, suavizar=True):
     df_total = pd.concat([df_home, df_away], ignore_index=True)
@@ -313,7 +299,6 @@ def analisar_mercados(df_home, df_away, suavizar=True):
         })
 
     return drop_reset_index(pd.DataFrame(painel))
-
 
 # Função para calcular média segura
 def safe_mean(df, col):
