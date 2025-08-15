@@ -86,25 +86,40 @@ def extrair_dados(linhas):
             i += 1
     return pd.DataFrame(jogos)
 
-#funções para calcular as médias de gols
-def media_home_gols_feitos(df_home):
-    media_gols_feitos = df_home["H_Gols_FT"].mean() if not df_home.empty else 0
-    return media_gols_feitos
 
-def media_home_gols_sofridos(df_home):
-    media_gols_sofridos = df_home["A_Gols_FT"].mean() if not df_home.empty else 0
-    return media_gols_sofridos
+def media_gols_marcados(df, team_name):
+    """Calcula a média de gols MARCADOS por um time específico,
+    independentemente de ser mandante ou visitante."""
+    if df.empty:
+        return 0.0
 
-def media_away_gols_feitos(df_away):
-    media_gols_feitos = df_away["A_Gols_FT"].mean() if not df_away.empty else 0
-    return media_gols_feitos
+    # Soma os gols marcados em casa (H_Gols_FT) e fora (A_Gols_FT)
+    gols_marcados = pd.concat([
+        df.loc[df['Home'] == team_name, 'H_Gols_FT'],
+        df.loc[df['Away'] == team_name, 'A_Gols_FT']
+    ])
 
-def media_away_gols_sofridos(df_away):
-    media_gols_sofridos = df_away["H_Gols_FT"].mean() if not df_away.empty else 0
-    return media_gols_sofridos
+    return gols_marcados.mean()
+
+
+def media_gols_sofridos(df, team_name):
+    """Calcula a média de gols SOFRIDOS por um time específico,
+    independentemente de ser mandante ou visitante."""
+    if df.empty:
+        return 0.0
+
+    # Soma os gols sofridos em casa (A_Gols_FT) e fora (H_Gols_FT)
+    gols_sofridos = pd.concat([
+        df.loc[df['Home'] == team_name, 'A_Gols_FT'],
+        df.loc[df['Away'] == team_name, 'H_Gols_FT']
+    ])
+
+    return gols_sofridos.mean()
 
 #estimar vencedor da partida
-def estimar_vencedor(df_home, df_away, pesos):
+
+
+def estimar_vencedor(df_home, df_away, pesos, home_team_name, away_team_name):
     home_jogos = df_home.shape[0]
     away_jogos = df_away.shape[0]
 
@@ -117,9 +132,9 @@ def estimar_vencedor(df_home, df_away, pesos):
     home_chutes_gol = df_home["H_Chute_Gol"].mean() if home_jogos > 0 else 0
     away_chutes_gol = df_away["A_Chute_Gol"].mean() if away_jogos > 0 else 0
 
-    media_home_gols = media_home_gols_feitos(df_home)
-    media_away_gols = media_away_gols_feitos(df_away)
-
+    media_home_gols_marcados = media_gols_marcados(df_home, home_team_name)
+    media_away_gols_marcados = media_gols_marcados(df_away, away_team_name)
+    
     home_eficiencia = (home_chutes_gol / home_chutes * 100) if home_chutes > 0 else 0
     away_eficiencia = (away_chutes_gol / away_chutes * 100) if away_chutes > 0 else 0
 
@@ -127,13 +142,13 @@ def estimar_vencedor(df_home, df_away, pesos):
     score_home = (home_ataques * pesos['ataques'] +
                   home_chutes * pesos['chutes'] +
                   home_chutes_gol * pesos['chutes_gol'] +
-                  media_home_gols * pesos['gols'] +
+                  media_home_gols_marcados * pesos['gols'] +
                   home_eficiencia * pesos['eficiencia'])
     
     score_away = (away_ataques * pesos['ataques'] +
                   away_chutes * pesos['chutes'] +
                   away_chutes_gol * pesos['chutes_gol'] +
-                  media_away_gols * pesos['gols'] +
+                  media_away_gols_marcados * pesos['gols'] +
                   away_eficiencia * pesos['eficiencia'])
     
     # Fator casa recebido por parâmetro

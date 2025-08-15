@@ -205,10 +205,10 @@ if not df.empty:
         }
 
     # Exibe as médias de gols
-    media_home_gols_marcados = dt.media_home_gols_feitos(df_home)
-    media_home_gols_sofridos = dt.media_home_gols_sofridos(df_home)
-    media_away_gols_marcados = dt.media_away_gols_feitos(df_away)
-    media_away_gols_sofridos = dt.media_away_gols_sofridos(df_away)
+    media_home_gols_marcados = dt.media_gols_marcados(df_home, home_team)
+    media_home_gols_sofridos = dt.media_gols_sofridos(df_home, home_team)
+    media_away_gols_marcados = dt.media_gols_marcados(df_away, away_team)
+    media_away_gols_sofridos = dt.media_gols_sofridos(df_away, away_team)
 
     #exibe as médias de gols
     st.markdown("### 📋 Médias de Gols Home e Away", unsafe_allow_html=True)
@@ -244,7 +244,7 @@ if not df.empty:
 
     # Calcula os dados
     vencedor, score_home, score_away, prob_home, prob_away, prob_draw, odd_home, odd_away, odd_draw = dt.estimar_vencedor(
-        df_home, df_away, pesos_modelo)
+        df_home, df_away, pesos_modelo, home_team, away_team)
 
     if vencedor == 'home':
         vencedor = home_team
