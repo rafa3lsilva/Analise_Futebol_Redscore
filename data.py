@@ -384,8 +384,8 @@ def estimar_linha_escanteios(df_home, df_away, home_team_name, away_team_name):
     esc_total_ajustado = (esc_home + esc_away) * (1 + fator_ofensivo)
 
     # 2. Define uma lista de linhas de mercado padrão para analisar
-    linhas_de_mercado = ['Over 8.5', 'Under 8.5', 'Over 9.5', 'Under 9.5',
-                         'Over 10.5', 'Under 10.5', 'Over 11.5', 'Under 11.5']
+    linhas_de_mercado = ['Over 8.5', 'Over 9.5', 'Over 10.5', 'Over 11.5',
+                         'Under 8.5',  'Under 9.5', 'Under 10.5', 'Under 11.5']
 
     # 3. Calcula a probabilidade para CADA linha de mercado
     resultados_mercado = []

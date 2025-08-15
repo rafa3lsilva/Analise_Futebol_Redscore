@@ -425,15 +425,25 @@ if not df.empty:
 
     st.markdown("#### Probabilidades por Linha de Mercado")
 
-    # Transforma a lista de resultados em um DataFrame para fácil visualização
-    df_escanteios = pd.DataFrame(
-        resultado_escanteios['Probabilidades por Mercado'])
+    # Transforma a lista de resultados em um DataFrame
+    df_escanteios = pd.DataFrame(resultado_escanteios['Probabilidades por Mercado'])
 
-    # Opcional: Exibir como métricas
-    cols = st.columns(len(df_escanteios))
+    # Define quantas colunas você quer por linha
+    num_colunas = 4
+    # Cria as colunas na primeira linha
+    cols = st.columns(num_colunas)
+
+    # Itera sobre cada mercado para exibir a métrica
     for i, row in df_escanteios.iterrows():
-        with cols[i]:
+        # Usa o operador de módulo (%) para encontrar a coluna correta (de 0 a 3)
+        col_index = i % num_colunas
+        with cols[col_index]:
+            # Exibe a métrica
             st.metric(label=row['Mercado'], value=f"{row['Probabilidade (%)']}%", delta=f"Odd Justa: {row['Odd Justa']}")
+        
+        # Se chegamos na última coluna da linha atual (e não é o último item), cria uma nova linha de colunas
+        if col_index == num_colunas - 1 and i < len(df_escanteios) - 1:
+            cols = st.columns(num_colunas)
     st.markdown("---")
     
     # filtro para exibir os últimos jogos (Home)
