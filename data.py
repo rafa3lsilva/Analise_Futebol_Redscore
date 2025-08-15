@@ -339,60 +339,69 @@ def calc_stats_team(df, team_name):
     }
 
 # Função para calcular probabilidade de bater o over usando Poisson
+
+
 def probabilidade_poisson_over(media_esperada, linha_str):
     try:
-        linha_num = float(linha_str.split()[-1])  # Ex: 'Over 10.5' → 10.5
-        linha_int = int(linha_num) + 1            # Poisson é discreta
-        prob = 1 - poisson.cdf(linha_int - 1, media_esperada)
+        # 1. Separa o tipo (Over/Under) e o número da linha
+        parts = linha_str.split()
+        # Converte para minúsculas ('over' ou 'under')
+        tipo_linha = parts[0].lower()
+        linha_num = float(parts[1])   # Ex: 9.5
+
+        # 2. Aplica a fórmula correta para cada cenário
+        if tipo_linha == 'over':
+            # Probabilidade de ser MAIOR OU IGUAL ao próximo inteiro
+            # Ex: Over 9.5 significa P(X >= 10)
+            linha_int = int(linha_num) + 1
+            prob = 1 - poisson.cdf(linha_int - 1, media_esperada)
+
+        elif tipo_linha == 'under':
+            # Probabilidade de ser MENOR OU IGUAL ao inteiro anterior
+            # Ex: Under 9.5 significa P(X <= 9)
+            linha_int = int(linha_num)
+            prob = poisson.cdf(linha_int, media_esperada)
+
+        else:
+            return 0.0  # Retorna 0 se a linha não for 'Over' ou 'Under'
+
         return round(prob, 4)
     except:
         return 0.0
 
 # Função principal
 def estimar_linha_escanteios(df_home, df_away, home_team_name, away_team_name):
-    # Estatísticas dos dois times
     stats_home = calc_stats_team(df_home, home_team_name)
     stats_away = calc_stats_team(df_away, away_team_name)
 
-    # Estimativa básica de escanteios
+    # 1. Calcula a média de escanteios esperada (lógica mantida)
     esc_home = (stats_home['esc_feitos_mean'] +
                 stats_away['esc_sofridos_mean']) / 2
     esc_away = (stats_away['esc_feitos_mean'] +
                 stats_home['esc_sofridos_mean']) / 2
-    esc_total = esc_home + esc_away
+    fator_ofensivo = (stats_home['finalizacoes_mean'] + stats_away['finalizacoes_mean'] +
+                      stats_home['ataques_mean'] + stats_away['ataques_mean']) / 600
+    esc_total_ajustado = (esc_home + esc_away) * (1 + fator_ofensivo)
 
-    # Fator ofensivo baseado em finalizações e ataques perigosos
-    fator_ofensivo = (
-        stats_home['finalizacoes_mean'] +
-        stats_away['finalizacoes_mean'] +
-        stats_home['ataques_mean'] +
-        stats_away['ataques_mean']
-    ) / 100  # Ajuste conforme escala
+    # 2. Define uma lista de linhas de mercado padrão para analisar
+    linhas_de_mercado = ['Over 8.5', 'Under 8.5', 'Over 9.5', 'Under 9.5',
+                         'Over 10.5', 'Under 10.5', 'Over 11.5', 'Under 11.5']
 
-    esc_total_ajustado = esc_total * (1 + fator_ofensivo)
+    # 3. Calcula a probabilidade para CADA linha de mercado
+    resultados_mercado = []
+    for linha in linhas_de_mercado:
+        prob = probabilidade_poisson_over(esc_total_ajustado, linha)
+        odd_justa = round(1 / prob, 2) if prob > 0 else None
+        resultados_mercado.append({
+            'Mercado': linha,
+            'Probabilidade (%)': round(prob * 100, 2),
+            'Odd Justa': odd_justa
+        })
 
-    # Sugestão de linha
-    if esc_total_ajustado < 8.5:
-        linha = 'Under 8.5'
-    elif esc_total_ajustado < 9.5:
-        linha = 'Under 9.5'
-    elif esc_total_ajustado < 10.5:
-        linha = 'Over 9.5'
-    elif esc_total_ajustado < 11.5:
-        linha = 'Over 10.5'
-    else:
-        linha = 'Over 11.5'
-
-    # Probabilidade e odd justa com Poisson
-    probabilidade = probabilidade_poisson_over(esc_total_ajustado, linha)
-    odd_justa = round(1 / probabilidade, 2) if probabilidade > 0 else None
-
-    # Retorna os valores
+    # 4. Retorna um dicionário com a média e a lista de probabilidades
     return {
         'Escanteios Mandante': round(esc_home, 2),
         'Escanteios Visitante': round(esc_away, 2),
         'Escanteios Totais Ajustados': round(esc_total_ajustado, 2),
-        'Linha Sugerida': linha,
-        'Probabilidade': round(probabilidade * 100, 2),  # em porcentagem
-        'Odd Justa': odd_justa
+        'Probabilidades por Mercado': resultados_mercado
     }

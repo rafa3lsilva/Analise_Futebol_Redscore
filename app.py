@@ -406,36 +406,36 @@ if not df.empty:
     st.markdown("---")
     
     st.markdown("### 📊 Estimativa de Escanteios", unsafe_allow_html=True)
+
+    # A chamada da função agora retorna um dicionário diferente
     resultado_escanteios = dt.estimar_linha_escanteios(
         df_home_final, df_away_final, home_team, away_team)
-    # Exibe métricas principais
-    col1, col2, col3, col4 = st.columns(4)
+
+    # Exibe as médias gerais
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("📊 Mandante", round(
-            resultado_escanteios['Escanteios Mandante'], 2))
+        st.metric("Média Cantos Mandante",
+                f"{resultado_escanteios['Escanteios Mandante']:.2f}")
     with col2:
-        st.metric("📊 Visitante", round(
-            resultado_escanteios['Escanteios Visitante'], 2))
+        st.metric("Média Cantos Visitante",
+                f"{resultado_escanteios['Escanteios Visitante']:.2f}")
     with col3:
-        st.metric("📈 Total Ajustado", round(
-            resultado_escanteios['Escanteios Totais Ajustados'], 2))
-    with col4:
-        st.metric("📌 Linha Sugerida", resultado_escanteios['Linha Sugerida'])
+        st.metric("Média Total Ajustada",
+                f"{resultado_escanteios['Escanteios Totais Ajustados']:.2f}")
 
-    # Probabilidade e odd justa
-    prob = resultado_escanteios.get('Probabilidade Over', 0.0)
-    odd_justa = round(1 / prob, 2) if prob > 0 else "N/A"
+    st.markdown("#### Probabilidades por Linha de Mercado")
 
-    valor_msg = "✅ Valor detectado!" if float(
-        resultado_escanteios['Odd Justa']) < 1.80 else "⚠️ Sem valor claro no momento."
+    # Transforma a lista de resultados em um DataFrame para fácil visualização
+    df_escanteios = pd.DataFrame(
+        resultado_escanteios['Probabilidades por Mercado'])
 
-    # Estilização com markdown
-    st.markdown(f"""
-    ### 🎯 Projeção de Mercado
-    - **Probabilidade de Over {resultado_escanteios['Linha Sugerida']}**: `{resultado_escanteios['Probabilidade']}%`  - **Odd Justa**: `{resultado_escanteios['Odd Justa']}` - {valor_msg}
-    """)
+    # Opcional: Exibir como métricas
+    cols = st.columns(len(df_escanteios))
+    for i, row in df_escanteios.iterrows():
+        with cols[i]:
+            st.metric(label=row['Mercado'], value=f"{row['Probabilidade (%)']}%", delta=f"Odd Justa: {row['Odd Justa']}")
     st.markdown("---")
-
+    
     # filtro para exibir os últimos jogos (Home)
     st.write(f"### Últimos {num_jogos_selecionado} jogos do {home_team}:")
     st.dataframe(dt.drop_reset_index(df_home))
