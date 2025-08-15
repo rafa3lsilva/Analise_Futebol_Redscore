@@ -18,17 +18,16 @@ def extrair_dados(linhas):
     jogos = []
     i = 0
 
-    # Adicione uma lista de palavras-chave para identificar uma linha de liga
-    palavras_chave_liga = ["League", "Cup", "Championship", "Serie", "CAF"]
+    # Define o padrão de data (DD.M ou D.M no início da linha)
+    padrao_data_liga = r'^\d{1,2}\.\d{1,2}\s+'
 
     while i < len(linhas) - 5:
         try:
-            # Verifica se alguma das palavras-chave está na linha
-            if any(palavra in linhas[i] for palavra in palavras_chave_liga):
+            # A CONDIÇÃO FOI ALTERADA PARA USAR O PADRÃO DE DATA
+            if re.match(padrao_data_liga, linhas[i]):
 
-                # --- Limpar o nome da liga ---
-                # Remove o padrão de data (ex: "29.8 ") do início da string
-                liga = re.sub(r'^\d+\.\d+\s*', '', linhas[i]).strip()
+                # A lógica de extração da liga continua a mesma e funciona perfeitamente
+                liga = re.sub(padrao_data_liga, '', linhas[i]).strip()
 
                 home = linhas[i+1]
                 placar_ft = re.search(r"(\d+)\s*-\s*(\d+)", linhas[i+3])
