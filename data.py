@@ -339,8 +339,6 @@ def calc_stats_team(df, team_name):
     }
 
 # Função para calcular probabilidade de bater o over usando Poisson
-
-
 def probabilidade_poisson_over(media_esperada, linha_str):
     try:
         # 1. Separa o tipo (Over/Under) e o número da linha
