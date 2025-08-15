@@ -8,6 +8,14 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+if "saved_analyses" not in st.session_state:
+    st.session_state.saved_analyses = []
+
+if "dados_jogos" not in st.session_state:
+    st.session_state.dados_jogos = None
+if "df_jogos" not in st.session_state:
+    st.session_state.df_jogos = pd.DataFrame()
+
 # Função para configurar a página Streamlit
 st.set_page_config(
     page_title="Análise Futebol",
@@ -68,19 +76,8 @@ if not st.session_state.dados_jogos:
         except Exception as e:
             st.error(f"Erro ao processar o arquivo: {e}")
 
-
-# Só chama extrair_dados se houver dados válidos
-df = pd.DataFrame()
-if st.session_state.dados_jogos:
-    df = dt.extrair_dados(st.session_state.dados_jogos)
-
-if st.session_state.dados_jogos:
-       if st.sidebar.button("🔄 Novo Arquivo"):
-            st.session_state.dados_jogos = None
-            st.session_state.df_jogos = pd.DataFrame()
-            st.rerun()
-
 # Exibe os dados apenas se o DataFrame não estiver vazio
+df = st.session_state.df_jogos
 if not df.empty:
     st.markdown("""
     <style>
@@ -453,3 +450,84 @@ if not df.empty:
     # filtro para exibir os últimos jogos (Away)
     st.write(f"### Últimos {num_jogos_selecionado} jogos do {away_team}:")
     st.dataframe(dt.drop_reset_index(df_away))
+
+    # seção para upload de novo arquivo
+    if st.sidebar.button("🔄 Novo Arquivo"):
+        # 1. Extrai os dados dos mercados e escanteios...
+        prob_over_1_5 = df_resultado_mercados.loc[df_resultado_mercados['Mercado']
+                                                == 'Over 1.5', 'Probabilidade (%)'].iloc[0]
+        prob_over_2_5 = df_resultado_mercados.loc[df_resultado_mercados['Mercado']
+                                                == 'Over 2.5', 'Probabilidade (%)'].iloc[0]
+        prob_btts = df_resultado_mercados.loc[df_resultado_mercados['Mercado']
+                                            == 'BTTS', 'Probabilidade (%)'].iloc[0]
+
+        df_escanteios = pd.DataFrame(
+            resultado_escanteios['Probabilidades por Mercado'])
+        linha_mais_provavel = df_escanteios.loc[df_escanteios['Probabilidade (%)'].idxmax(
+        )]
+        linha_escanteio_str = f"{linha_mais_provavel['Mercado']} ({linha_mais_provavel['Probabilidade (%)']:.1f}%)"
+
+        # 2. Dicionário da análise
+        current_analysis = {
+            # ... (todos os seus campos para salvar, como "Liga", "Time da Casa", etc.)
+            "Liga": selected_league,
+            "Time da Casa": home_team,
+            "Time Visitante": away_team,
+            "Cenário": selected_scenario,
+            "Jogos Analisados": f"{len(df_home)} vs {len(df_away)}",
+            "Prob. Casa (%)": prob_home,
+            "Prob. Empate (%)": prob_draw,
+            "Prob. Visitante (%)": prob_away,
+            "Prob. Gol HT (%)": round(analise_ht_nova['probabilidade'], 2),
+            "Odd Justa Gol HT": round(analise_ht_nova['odd_justa'], 2),
+            "Prob. Over 1.5 (%)": prob_over_1_5,
+            "Prob. Over 2.5 (%)": prob_over_2_5,
+            "Prob. BTTS (%)": prob_btts,
+            "Melhor Linha Escanteios": linha_escanteio_str,
+        }
+
+        # 3. Adiciona ao relatório, limpa o estado e reinicia
+        st.session_state.saved_analyses.append(current_analysis)
+        st.toast(f"Análise de '{home_team} vs {away_team}' salva no relatório!")
+
+        st.session_state.dados_jogos = None
+        st.session_state.df_jogos = pd.DataFrame()
+        st.rerun()
+
+if st.session_state.saved_analyses:
+    st.sidebar.markdown("---")
+    st.sidebar.header("📋 Relatório de Análises")
+
+    num_saved = len(st.session_state.saved_analyses)
+    st.sidebar.info(f"Você tem **{num_saved}** análise(s) salva(s).")
+
+    df_report = pd.DataFrame(st.session_state.saved_analyses)
+
+    # Função para converter para Excel
+    @st.cache_data
+    def to_excel(df):
+        from io import BytesIO
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Analises')
+        processed_data = output.getvalue()
+        return processed_data
+
+    excel_data = to_excel(df_report)
+
+    # Botão de download (agora visível)
+    st.sidebar.download_button(
+        label="📥 Descarregar Relatório (Excel)",
+        data=excel_data,
+        file_name="relatorio_analises.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    # Botão para limpar
+    if st.sidebar.button("Limpar Análises Salvas"):
+        st.session_state.saved_analyses = []
+        st.rerun()
+
+    # Expansor para ver as análises
+    with st.sidebar.expander("Ver análises salvas"):
+        st.dataframe(df_report)
