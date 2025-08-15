@@ -377,15 +377,17 @@ if not df.empty:
 
     st.markdown("---")
     
-    df_resultado = dt.analisar_mercados(
-        df_home, df_away, num_jogos_selecionado)
+    df_home_final = df_home.head(num_jogos_home)
+    df_away_final = df_away.head(num_jogos_away)
+
+    df_resultado_mercados = dt.analisar_mercados(df_home_final, df_away_final)
 
     # Cartões separados
     st.subheader("🎯 Probabilidades por Mercado")
-    cols = st.columns(len(df_resultado))
+    cols = st.columns(len(df_resultado_mercados))
 
     for i, col in enumerate(cols):
-        mercado = df_resultado.iloc[i]
+        mercado = df_resultado_mercados.iloc[i]
         col.metric(
             label=mercado["Mercado"],
             value=f'{mercado["Probabilidade (%)"]}%',
@@ -394,7 +396,7 @@ if not df.empty:
 
     # Gráfico de barras
     st.subheader("📈 Visualização Gráfica")
-    chart = alt.Chart(df_resultado).mark_bar().encode(
+    chart = alt.Chart(df_resultado_mercados).mark_bar().encode(
         x=alt.X('Mercado', sort=None),
         y='Probabilidade (%)',
         color='Mercado',
@@ -404,31 +406,33 @@ if not df.empty:
     st.markdown("---")
     
     st.markdown("### 📊 Estimativa de Escanteios", unsafe_allow_html=True)
-    resultado = dt.estimar_linha_escanteios(
-        df_home, df_away, num_jogos_selecionado)
+    resultado_escanteios = dt.estimar_linha_escanteios(
+        df_home_final, df_away_final, home_team, away_team)
     # Exibe métricas principais
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("📊 Mandante", round(resultado['Escanteios Mandante'], 2))
+        st.metric("📊 Mandante", round(
+            resultado_escanteios['Escanteios Mandante'], 2))
     with col2:
-        st.metric("📊 Visitante", round(resultado['Escanteios Visitante'], 2))
+        st.metric("📊 Visitante", round(
+            resultado_escanteios['Escanteios Visitante'], 2))
     with col3:
         st.metric("📈 Total Ajustado", round(
-            resultado['Escanteios Totais Ajustados'], 2))
+            resultado_escanteios['Escanteios Totais Ajustados'], 2))
     with col4:
-        st.metric("📌 Linha Sugerida", resultado['Linha Sugerida'])
+        st.metric("📌 Linha Sugerida", resultado_escanteios['Linha Sugerida'])
 
     # Probabilidade e odd justa
-    prob = resultado.get('Probabilidade Over', 0.0)
+    prob = resultado_escanteios.get('Probabilidade Over', 0.0)
     odd_justa = round(1 / prob, 2) if prob > 0 else "N/A"
 
     valor_msg = "✅ Valor detectado!" if float(
-        resultado['Odd Justa']) < 1.80 else "⚠️ Sem valor claro no momento."
+        resultado_escanteios['Odd Justa']) < 1.80 else "⚠️ Sem valor claro no momento."
 
     # Estilização com markdown
     st.markdown(f"""
     ### 🎯 Projeção de Mercado
-    - **Probabilidade de Over {resultado['Linha Sugerida']}**: `{resultado['Probabilidade']}%`  - **Odd Justa**: `{resultado['Odd Justa']}` - {valor_msg}
+    - **Probabilidade de Over {resultado_escanteios['Linha Sugerida']}**: `{resultado_escanteios['Probabilidade']}%`  - **Odd Justa**: `{resultado_escanteios['Odd Justa']}` - {valor_msg}
     """)
     st.markdown("---")
 

@@ -273,34 +273,9 @@ def analise_gol_ht(df_home, df_away):
         "media_25ft": media_25ft * 100,
     }
 
-def contar_over_1_5(df_home, df_away):
-    jogos_com_over = df_home[(df_home["H_Gols_FT"] + df_home["A_Gols_FT"]) > 1].shape[0]
-    total_jogos = df_home.shape[0]
-    return jogos_com_over / total_jogos if total_jogos > 0 else 0.0
 
-
-def contar_over_2_5(df_home, df_away):
-    jogos_com_over = df_home[(df_home["H_Gols_FT"] + df_home["A_Gols_FT"]) > 2].shape[0]
-    total_jogos = df_home.shape[0]
-    return jogos_com_over / total_jogos if total_jogos > 0 else 0.0
-
-
-def contar_btts(df_home, df_away):
-    jogos_com_btts = df_home[(df_home["H_Gols_FT"] > 0) & (df_home["A_Gols_FT"] > 0)].shape[0]
-    total_jogos = df_home.shape[0]
-    return jogos_com_btts / total_jogos if total_jogos > 0 else 0.0
-
-
-def analisar_mercados(df_home, df_away, num_jogos, suavizar=True):
-    import pandas as pd
-
-    # Filtrar os últimos jogos
-    df_home_filtrado = df_home.tail(num_jogos)
-    df_away_filtrado = df_away.tail(num_jogos)
-
-    # Unir os dois DataFrames
-    df_total = pd.concat(
-        [df_home_filtrado, df_away_filtrado], ignore_index=True)
+def analisar_mercados(df_home, df_away, suavizar=True):
+    df_total = pd.concat([df_home, df_away], ignore_index=True)
     total_jogos = df_total.shape[0]
 
     # Funções auxiliares
@@ -345,13 +320,37 @@ def safe_mean(df, col):
     return df[col].mean() if col in df.columns else 0.0
 
 # Função para calcular estatísticas dos times
-def calc_stats(df):
+def calc_stats_team(df, team_name):
+    """Calcula as estatísticas para um time específico dentro de um DataFrame."""
+    # Escanteios feitos pelo time
+    esc_feitos = pd.concat([
+        df.loc[df['Home'] == team_name, 'H_Escanteios'],
+        df.loc[df['Away'] == team_name, 'A_Escanteios']
+    ])
+    # Escanteios sofridos pelo time
+    esc_sofridos = pd.concat([
+        df.loc[df['Home'] == team_name, 'A_Escanteios'],
+        df.loc[df['Away'] == team_name, 'H_Escanteios']
+    ])
+
+    # Finalizações feitas pelo time
+    finalizacoes = pd.concat([
+        df.loc[df['Home'] == team_name, 'H_Chute'],
+        df.loc[df['Away'] == team_name, 'A_Chute']
+    ])
+
+    # Ataques feitos pelo time
+    ataques = pd.concat([
+        df.loc[df['Home'] == team_name, 'H_Ataques'],
+        df.loc[df['Away'] == team_name, 'A_Ataques']
+    ])
+
     return {
-        'esc_feitos_mean': safe_mean(df, 'H_Escanteios'),
-        'esc_sofridos_mean': safe_mean(df, 'A_Escanteios'),
-        'esc_feitos_std': df['H_Escanteios'].std() if 'H_Escanteios' in df.columns else 0.0,
-        'finalizacoes_mean': safe_mean(df, 'H_Chute'),
-        'ataques_mean': safe_mean(df, 'H_Ataques')
+        'esc_feitos_mean': esc_feitos.mean(),
+        'esc_sofridos_mean': esc_sofridos.mean(),
+        'esc_feitos_std': esc_feitos.std(),
+        'finalizacoes_mean': finalizacoes.mean(),
+        'ataques_mean': ataques.mean()
     }
 
 # Função para calcular probabilidade de bater o over usando Poisson
@@ -365,14 +364,10 @@ def probabilidade_poisson_over(media_esperada, linha_str):
         return 0.0
 
 # Função principal
-def estimar_linha_escanteios(df_home, df_away, num_jogos):
-    # Filtra os últimos jogos
-    df_home_last = df_home.tail(num_jogos)
-    df_away_last = df_away.tail(num_jogos)
-
+def estimar_linha_escanteios(df_home, df_away, home_team_name, away_team_name):
     # Estatísticas dos dois times
-    stats_home = calc_stats(df_home_last)
-    stats_away = calc_stats(df_away_last)
+    stats_home = calc_stats_team(df_home, home_team_name)
+    stats_away = calc_stats_team(df_away, away_team_name)
 
     # Estimativa básica de escanteios
     esc_home = (stats_home['esc_feitos_mean'] +
