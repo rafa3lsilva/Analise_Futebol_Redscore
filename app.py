@@ -4,6 +4,7 @@ import altair as alt
 import data as dt
 import sidebar as sb
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,30 +52,63 @@ if "dados_jogos" not in st.session_state:
 if "df_jogos" not in st.session_state:
     st.session_state.df_jogos = pd.DataFrame()
 
-# Upload do arquivo (só aparece se ainda não foi carregado)
-if not st.session_state.dados_jogos:
+# --- 3. LÓGICA DE COLETA DE DADOS (COM ABAS) ---
+st.markdown("### 🌐 Escolha o método de coleta de dados")
+tab1, tab2 = st.tabs(["Analisar via URL (Automático)",
+                     "Analisar via Ficheiro (.txt)"])
+
+# --- Aba 1: Web Scraping ---
+with tab1:
+    st.info(
+        "Cole os URLs das páginas das equipas do Redscore para uma análise automatizada.")
+    col1, col2 = st.columns(2)
+    with col1:
+        # Usamos 'key' para garantir que os inputs sejam únicos
+        url1 = st.text_input(
+            "URL da Equipa 1:", "https://redscores.com/pt-br/team/sao-paulo/3496", key="url1")
+    with col2:
+        url2 = st.text_input(
+            "URL da Equipa 2:", "https://redscores.com/pt-br/team/sport-recife/2352", key="url2")
+
+    if st.button("🚀 Iniciar Análise via Web Scraping"):
+        with st.spinner("A coletar e a processar os dados... Isso pode demorar um pouco (até 30 segundos)."):
+            dados_time1 = dt.raspar_dados_time(url1)
+            time.sleep(2)  # Pausa para não sobrecarregar o site
+            dados_time2 = dt.raspar_dados_time(url2)
+
+            dados_completos = dados_time1 + dados_time2
+
+            if not dados_completos:
+                st.error(
+                    "Não foi possível extrair dados dos URLs fornecidos. Verifique os links ou a estrutura do site.")
+            else:
+                df_final = dt.processar_dados_raspados(dados_completos)
+                st.session_state.df_jogos = df_final  # Guarda o resultado no estado da sessão
+                st.success(
+                    f"Dados de {len(df_final)} jogos processados com sucesso!")
+                time.sleep(2)  # Pequena pausa para o utilizador ler a mensagem
+                st.rerun()
+
+# --- Aba 2: Upload de Ficheiro ---
+with tab2:
+    st.info("Use este método se o Web Scraping falhar ou para analisar dados de um ficheiro .txt salvo anteriormente.")
     uploaded_file = st.file_uploader(
-        "📁 Escolha o arquivo .txt com os dados dos jogos", type="txt")
+        "📁 Escolha o arquivo .txt com os dados dos jogos", type="txt", key="uploader")
     if uploaded_file:
         try:
             linhas = uploaded_file.read().decode("utf-8").splitlines()
             linhas = [linha.strip() for linha in linhas if linha.strip()]
-            if len(linhas) < 20:
-                st.error(
-                    "Arquivo com poucos dados. Verifique se o arquivo contém informações suficientes de jogos.")
+            df_temp = dt.extrair_dados(linhas)
+            if df_temp.empty:
+                st.error("Não foi possível extrair dados válidos do ficheiro.")
             else:
-                df_temp = dt.extrair_dados(linhas)
-                if df_temp.empty:
-                    st.error("Não foi possível extrair dados válidos do arquivo.")
-                else:
-                    st.session_state.dados_jogos = linhas
-                    st.session_state.df_jogos = df_temp
-                    st.rerun()
-        except UnicodeDecodeError:
-            st.error(
-                "Erro ao ler o arquivo. Certifique-se de que está em formato .txt e codificação UTF-8.")
+                st.session_state.dados_jogos = linhas  # Guarda as linhas originais
+                st.session_state.df_jogos = df_temp  # Guarda o DataFrame
+                st.success("Ficheiro .txt carregado e processado com sucesso!")
+                time.sleep(2)
+                st.rerun()
         except Exception as e:
-            st.error(f"Erro ao processar o arquivo: {e}")
+            st.error(f"Erro ao processar o ficheiro: {e}")
 
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
