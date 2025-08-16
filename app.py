@@ -157,11 +157,19 @@ if not df.empty:
     leagues = sorted(df['Liga'].unique())
     all_teams = sorted(pd.unique(df[['Home', 'Away']].values.ravel('K')))
 
-    selected_league = st.sidebar.selectbox(
-        'Filtrar Liga:', ['Todas'] + leagues)
+    # --- LÓGICA INTELIGENTE PARA IDENTIFICAR OS TIMES PRINCIPAIS ---
+    # Contamos a frequência de cada time no DataFrame
+    contagem_times = pd.concat([df['Home'], df['Away']]).value_counts()
+    # Os dois times que mais aparecem são provavelmente os principais
+    times_principais = contagem_times.nlargest(2).index.tolist()
 
-    home_index = 0
-    away_index = 1 if len(all_teams) > 1 else 0
+    # Define os índices padrão para os seletores
+    home_index = all_teams.index(times_principais[0]) if len(
+        times_principais) > 0 and times_principais[0] in all_teams else 0
+    away_index = all_teams.index(times_principais[1]) if len(
+        times_principais) > 1 and times_principais[1] in all_teams else 1
+
+    selected_league = st.sidebar.selectbox('Filtrar Liga:', ['Todas'] + leagues)
     selected_home_team = st.sidebar.selectbox(
         'Time da Casa:', all_teams, index=home_index)
     selected_away_team = st.sidebar.selectbox(
