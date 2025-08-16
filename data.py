@@ -210,6 +210,58 @@ def raspar_dados_time(url, limite_jogos=41):
 
     return jogos_raspados
 
+def processar_dados_raspados(lista_de_jogos):
+    """
+    Converte os dados raspados (que são strings) para o formato final do DataFrame,
+    pronto para ser usado pelas funções de análise.
+    """
+    jogos_processados = []
+    for jogo in lista_de_jogos:
+        try:
+            # Separa os placares e estatísticas que estão em formato "X - Y"
+            placar_ft = [int(p.strip()) for p in jogo['Placar_FT'].split('-')]
+            placar_ht = [int(p.strip()) for p in jogo['Placar_HT'].split('-')]
+            chutes = [int(p.strip()) for p in jogo['Chutes'].split('-')]
+            chutes_gol = [int(p.strip())
+                          for p in jogo['Chutes_Gol'].split('-')]
+            ataques = [int(p.strip()) for p in jogo['Ataques'].split('-')]
+            escanteios = [int(p.strip())
+                          for p in jogo['Escanteios'].split('-')]
+
+            # Converte as odds para float, tratando o caso de não existirem
+            odd_h = float(jogo['Odd_H_str']) if jogo['Odd_H_str'].replace(
+                '.', '', 1).isdigit() else 0.0
+            odd_d = float(jogo['Odd_D_str']) if jogo['Odd_D_str'].replace(
+                '.', '', 1).isdigit() else 0.0
+            odd_a = float(jogo['Odd_A_str']) if jogo['Odd_A_str'].replace(
+                '.', '', 1).isdigit() else 0.0
+
+            jogos_processados.append({
+                "Liga": jogo['Liga'],
+                "Home": jogo['Home'],
+                "Away": jogo['Away'],
+                "H_Gols_FT": placar_ft[0],
+                "A_Gols_FT": placar_ft[1],
+                "H_Gols_HT": placar_ht[0],
+                "A_Gols_HT": placar_ht[1],
+                "H_Chute": chutes[0],
+                "A_Chute": chutes[1],
+                "H_Chute_Gol": chutes_gol[0],
+                "A_Chute_Gol": chutes_gol[1],
+                "H_Ataques": ataques[0],
+                "A_Ataques": ataques[1],
+                "H_Escanteios": escanteios[0],
+                "A_Escanteios": escanteios[1],
+                "Odd_H": odd_h,
+                "Odd_D": odd_d,
+                "Odd_A": odd_a
+            })
+        except (ValueError, IndexError):
+            # Ignora jogos que não tenham todas as estatísticas completas
+            continue
+
+    return pd.DataFrame(jogos_processados)
+
 def media_gols_marcados(df, team_name):
     """Calcula a média de gols MARCADOS por um time específico,
     independentemente de ser mandante ou visitante."""

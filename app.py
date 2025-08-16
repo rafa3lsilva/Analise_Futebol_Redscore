@@ -92,23 +92,36 @@ with tab1:
 # --- Aba 2: Upload de Ficheiro ---
 with tab2:
     st.info("Use este método se o Web Scraping falhar ou para analisar dados de um ficheiro .txt salvo anteriormente.")
+
+    # Usamos o 'on_change' para chamar uma função de processamento apenas quando o ficheiro MUDA.
+    def processar_ficheiro_txt():
+        # Acede ao ficheiro através do estado da sessão
+        uploaded_file = st.session_state.uploader
+        if uploaded_file:
+            try:
+                linhas = uploaded_file.read().decode("utf-8").splitlines()
+                linhas = [linha.strip() for linha in linhas if linha.strip()]
+                df_temp = dt.extrair_dados(linhas)
+                if df_temp.empty:
+                    st.error(
+                        "Não foi possível extrair dados válidos do ficheiro.")
+                    st.session_state.df_jogos = pd.DataFrame()  # Limpa em caso de erro
+                else:
+                    # Guarda o DataFrame e limpa a fonte de dados para evitar reprocessamento
+                    st.session_state.df_jogos = df_temp
+                    st.session_state.dados_jogos = linhas  # Pode ser útil manter
+                    st.success(
+                        "Ficheiro .txt carregado e processado com sucesso!")
+            except Exception as e:
+                st.error(f"Erro ao processar o ficheiro: {e}")
+
     uploaded_file = st.file_uploader(
-        "📁 Escolha o arquivo .txt com os dados dos jogos", type="txt", key="uploader")
-    if uploaded_file:
-        try:
-            linhas = uploaded_file.read().decode("utf-8").splitlines()
-            linhas = [linha.strip() for linha in linhas if linha.strip()]
-            df_temp = dt.extrair_dados(linhas)
-            if df_temp.empty:
-                st.error("Não foi possível extrair dados válidos do ficheiro.")
-            else:
-                st.session_state.dados_jogos = linhas  # Guarda as linhas originais
-                st.session_state.df_jogos = df_temp  # Guarda o DataFrame
-                st.success("Ficheiro .txt carregado e processado com sucesso!")
-                time.sleep(2)
-                st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao processar o ficheiro: {e}")
+        "📁 Escolha o arquivo .txt com os dados dos jogos",
+        type="txt",
+        key="uploader",
+        # Chama a função quando um novo ficheiro é carregado
+        on_change=processar_ficheiro_txt
+    )
 
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
