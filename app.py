@@ -8,6 +8,9 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+if "data_loaded_successfully" not in st.session_state:
+    st.session_state.data_loaded_successfully = False
+
 if "saved_analyses" not in st.session_state:
     st.session_state.saved_analyses = []
 
@@ -51,21 +54,34 @@ if "dados_jogos" not in st.session_state:
 if "df_jogos" not in st.session_state:
     st.session_state.df_jogos = pd.DataFrame()
 
-import pandas as pd
-import streamlit as st
-
-# --- 3. CARREGAMENTO DOS DADOS DO CSV ---
+# Carrega dados do github
 URL_DADOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
 df_jogos = pd.DataFrame()
 
 try:
     df_jogos = pd.read_csv(URL_DADOS)
 
-    # converter e ordenar por Data
+    # Guarda o número de linhas antes de qualquer alteração
+    num_linhas_original = len(df_jogos)
+
+    # Converte a coluna 'Data'
     df_jogos['Data'] = pd.to_datetime(
         df_jogos['Data'], format="%d-%m-%Y", errors="coerce"
-    ).dt.date
+    )
 
+    # Verifica se alguma data falhou na conversão (tornou-se NaT/null)
+    jogos_com_data_invalida = df_jogos['Data'].isnull().sum()
+
+    if jogos_com_data_invalida > 0:
+        # Mostra um aviso ao utilizador na interface
+        st.warning(
+            f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
+            f"não estava no formato esperado (DD-MM-AAAA)."
+        )
+        # Remove as linhas com datas inválidas para não afetar as análises
+        df_jogos.dropna(subset=['Data'], inplace=True)
+
+    df_jogos['Data'] = df_jogos['Data'].dt.date
     df_jogos = df_jogos.sort_values(
         by="Data", ascending=False
     ).reset_index(drop=True)
@@ -73,13 +89,20 @@ try:
     # ✅ Atualiza session_state
     st.session_state.df_jogos = df_jogos
 
-    st.success(
-        f"Base de dados carregada do GitHub com {len(df_jogos)} jogos."
-    )
+    # Verifica se os dados ainda não foram carregados com sucesso nesta sessão
+    if not st.session_state.data_loaded_successfully:
+        # Mostra uma notificação temporária
+        st.toast(
+            f"Base de dados carregada com {len(df_jogos)} jogos!",
+            icon="✅"
+        )
+        # Marca que os dados foram carregados com sucesso.
+        st.session_state.data_loaded_successfully = True
 
 except Exception as e:
     st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
     st.stop()
+
 # separa coluna "Liga" em duas: Pais e Liga
 df_jogos[['Pais', 'Liga']] = df_jogos['Liga'].str.split(" - ", n=1, expand=True)
 
@@ -179,7 +202,7 @@ if not df.empty:
         df_away_base = df_filtrado_liga[df_filtrado_liga['Away']
                                         == selected_away_team].copy().reset_index(drop=True)
 
-    # --- 2. FILTRO DE INTERVALO DE JOGOS (ÚLTIMOS N JOGOS) ---
+    # Filtro de Intervalo de jogos
     with st.container():
         st.markdown("### 📅 Intervalo de Jogos")
         intervalo = st.radio(
@@ -219,7 +242,7 @@ if not df.empty:
         peso_gols = st.slider("Peso dos Gols", 0.0, 3.0, 1.5)
         peso_eficiencia = st.slider("Peso da Eficiência (%)", 0.0, 5.0, 2.0)
         fator_casa = st.slider("Fator Casa (Multiplicador)",
-                            1.0, 1.5, 1.05)  # Alterado para multiplicador
+                            1.0, 1.5, 1.05) 
 
         # Crie o dicionário de pesos
         pesos_modelo = {
@@ -237,28 +260,28 @@ if not df.empty:
     media_away_gols_marcados = dt.media_gols_marcados(df_away, away_team)
     media_away_gols_sofridos = dt.media_gols_sofridos(df_away, away_team)
 
-    #exibe as médias de gols
+    # Exibe as médias de gols
     st.markdown("### 📋 Médias de Gols Home e Away", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
-        <div style="background-color:#1f77b4; padding:5px; border-radius:8px; text-align:center; color:white;">
+        <div style="background-color:#1f77b4; padding:15px; border-radius:8px; text-align:center; color:white;margin-bottom: 15px;">
             <h3>🏠 {home_team}</h3>
-            <p style="font-size:16px;">⚽ Média de Gols Marcados: <strong>{media_home_gols_marcados:.2f}</strong></p>
-            <p style="font-size:16px;">🛡️ Média de Gols Sofridos: <strong>{media_home_gols_sofridos:.2f}</strong></p>
+            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_home_gols_marcados:.2f}</strong></p>
+            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_home_gols_sofridos:.2f}</strong></p>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"""
-        <div style="background-color:#d62728; padding:5px; border-radius:8px; text-align:center; color:white;">
+        <div style="background-color:#d62728; padding:15px; border-radius:8px; text-align:center; color:white;">
             <h3>✈️ {away_team}</h3>
-            <p style="font-size:16px;">⚽ Média de Gols Marcados: <strong>{media_away_gols_marcados:.2f}</strong></p>
-            <p style="font-size:16px;">🛡️ Média de Gols Sofridos: <strong>{media_away_gols_sofridos:.2f}</strong></p>
+            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_away_gols_marcados:.2f}</strong></p>
+            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_away_gols_sofridos:.2f}</strong></p>
         </div>
         <br>
         """, unsafe_allow_html=True)
-
+    
     # Taxa de Vitórias home
     df_home['resultado'] = df_home['H_Gols_FT'] > df_home['A_Gols_FT']
     vitoria = df_home[df_home['resultado'] == 1].shape[0]
@@ -290,9 +313,8 @@ if not df.empty:
         """,
         unsafe_allow_html=True
 )
-
+    # Exibindo mais dados sobre os times
     col1, col2, col3 = st.columns(3)
-
     with col1:
         st.markdown(f"### 🏠 {home_team}")
         st.metric("Probabilidade de Vitória", f"{prob_home}%")
@@ -316,7 +338,6 @@ if not df.empty:
 
     # Criar colunas para os inputs
     col_val1, col_val2, col_val3 = st.columns(3)
-
     with col_val1:
         odd_mercado_home = st.number_input(
             f"Odd Mercado para {home_team}", min_value=1.00, value=odd_home, step=0.01)
@@ -349,6 +370,7 @@ if not df.empty:
         else:
             st.warning("Sem valor aparente.")
 
+    # Analise de gol HT
     st.markdown("---")
     st.markdown("#### Análise de Gol no Primeiro Tempo (HT)",
                 unsafe_allow_html=True)
@@ -425,7 +447,7 @@ if not df.empty:
         y='Probabilidade (%)',
         color='Mercado',
         tooltip=['Mercado', 'Probabilidade (%)', 'Odd Justa']
-    ).properties(width=700, height=400)
+    )
     st.altair_chart(chart, use_container_width=True)
     st.markdown("---")
     
