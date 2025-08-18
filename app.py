@@ -5,6 +5,7 @@ import data as dt
 import sidebar as sb
 import logging
 import time
+import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,76 +53,37 @@ if "dados_jogos" not in st.session_state:
 if "df_jogos" not in st.session_state:
     st.session_state.df_jogos = pd.DataFrame()
 
-# --- 3. LÓGICA DE COLETA DE DADOS (COM ABAS) ---
-st.markdown("### 🌐 Escolha o método de coleta de dados")
-tab1, tab2 = st.tabs(["Analisar via URL (Automático)",
-                     "Analisar via Ficheiro (.txt)"])
+import pandas as pd
+import streamlit as st
 
-# --- Aba 1: Web Scraping ---
-with tab1:
-    st.info(
-        "Cole os URLs das páginas das equipas do Redscore para uma análise automatizada.")
-    col1, col2 = st.columns(2)
-    with col1:
-        # Usamos 'key' para garantir que os inputs sejam únicos
-        url1 = st.text_input(
-            "URL da Equipa 1:", "https://redscores.com/pt-br/team/sao-paulo/3496", key="url1")
-    with col2:
-        url2 = st.text_input(
-            "URL da Equipa 2:", "https://redscores.com/pt-br/team/sport-recife/2352", key="url2")
+# --- 3. CARREGAMENTO DOS DADOS DO CSV ---
+URL_DADOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
+df_jogos = pd.DataFrame()
 
-    if st.button("🚀 Iniciar Análise via Web Scraping"):
-        with st.spinner("A coletar e a processar os dados... Isso pode demorar um pouco (até 30 segundos)."):
-            dados_time1 = dt.raspar_dados_time(url1)
-            time.sleep(2)  # Pausa para não sobrecarregar o site
-            dados_time2 = dt.raspar_dados_time(url2)
+try:
+    df_jogos = pd.read_csv(URL_DADOS)
 
-            dados_completos = dados_time1 + dados_time2
+    # converter e ordenar por Data
+    df_jogos['Data'] = pd.to_datetime(
+        df_jogos['Data'], format="%d-%m-%Y", errors="coerce"
+    ).dt.date
 
-            if not dados_completos:
-                st.error(
-                    "Não foi possível extrair dados dos URLs fornecidos. Verifique os links ou a estrutura do site.")
-            else:
-                df_final = dt.processar_dados_raspados(dados_completos)
-                st.session_state.df_jogos = df_final  # Guarda o resultado no estado da sessão
-                st.success(
-                    f"Dados de {len(df_final)} jogos processados com sucesso!")
-                time.sleep(2)  # Pequena pausa para o utilizador ler a mensagem
-                st.rerun()
+    df_jogos = df_jogos.sort_values(
+        by="Data", ascending=False
+    ).reset_index(drop=True)
 
-# --- Aba 2: Upload de Ficheiro ---
-with tab2:
-    st.info("Use este método se o Web Scraping falhar ou para analisar dados de um ficheiro .txt salvo anteriormente.")
+    # ✅ Atualiza session_state
+    st.session_state.df_jogos = df_jogos
 
-    # Usamos o 'on_change' para chamar uma função de processamento apenas quando o ficheiro MUDA.
-    def processar_ficheiro_txt():
-        # Acede ao ficheiro através do estado da sessão
-        uploaded_file = st.session_state.uploader
-        if uploaded_file:
-            try:
-                linhas = uploaded_file.read().decode("utf-8").splitlines()
-                linhas = [linha.strip() for linha in linhas if linha.strip()]
-                df_temp = dt.extrair_dados(linhas)
-                if df_temp.empty:
-                    st.error(
-                        "Não foi possível extrair dados válidos do ficheiro.")
-                    st.session_state.df_jogos = pd.DataFrame()  # Limpa em caso de erro
-                else:
-                    # Guarda o DataFrame e limpa a fonte de dados para evitar reprocessamento
-                    st.session_state.df_jogos = df_temp
-                    st.session_state.dados_jogos = linhas  # Pode ser útil manter
-                    st.success(
-                        "Ficheiro .txt carregado e processado com sucesso!")
-            except Exception as e:
-                st.error(f"Erro ao processar o ficheiro: {e}")
-
-    uploaded_file = st.file_uploader(
-        "📁 Escolha o arquivo .txt com os dados dos jogos",
-        type="txt",
-        key="uploader",
-        # Chama a função quando um novo ficheiro é carregado
-        on_change=processar_ficheiro_txt
+    st.success(
+        f"Base de dados carregada do GitHub com {len(df_jogos)} jogos."
     )
+
+except Exception as e:
+    st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
+    st.stop()
+# separa coluna "Liga" em duas: Pais e Liga
+df_jogos[['Pais', 'Liga']] = df_jogos['Liga'].str.split(" - ", n=1, expand=True)
 
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
@@ -150,35 +112,47 @@ if not df.empty:
     """, unsafe_allow_html=True)
 
 if not df.empty:
-    # --- Bloco de Filtros da Sidebar---
+    # --- Bloco de Filtros da Sidebar ---
     st.sidebar.markdown("### Filtros da Análise")
 
-    # Filtros de Liga e Times
-    leagues = sorted(df['Liga'].unique())
-    all_teams = sorted(pd.unique(df[['Home', 'Away']].values.ravel('K')))
+    # ✅ Filtro de País
+    paises = sorted(df['Pais'].unique())
+    selected_country = st.sidebar.selectbox("Filtrar País:", ["Todos"] + paises)
 
-    # --- LÓGICA INTELIGENTE PARA IDENTIFICAR OS TIMES PRINCIPAIS ---
-    # Contamos a frequência de cada time no DataFrame
-    contagem_times = pd.concat([df['Home'], df['Away']]).value_counts()
-    # Os dois times que mais aparecem são provavelmente os principais
+    df_filtrado = df.copy()
+    if selected_country != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["Pais"] == selected_country]
+
+    # ✅ Filtro de Liga (dependente do país)
+    ligas = sorted(df_filtrado['Liga'].unique())
+    selected_league = st.sidebar.selectbox("Filtrar Liga:", ["Todas"] + ligas)
+
+    if selected_league != "Todas":
+        df_filtrado = df_filtrado[df_filtrado["Liga"] == selected_league]
+
+    # ✅ Filtro de Times (dependente da liga escolhida)
+    all_teams = sorted(pd.unique(df_filtrado[['Home', 'Away']].values.ravel('K')))
+
+    # lógica para identificar os times principais
+    contagem_times = pd.concat([df_filtrado['Home'], df_filtrado['Away']]).value_counts()
     times_principais = contagem_times.nlargest(2).index.tolist()
 
-    # Define os índices padrão para os seletores
-    home_index = all_teams.index(times_principais[0]) if len(
-        times_principais) > 0 and times_principais[0] in all_teams else 0
-    away_index = all_teams.index(times_principais[1]) if len(
-        times_principais) > 1 and times_principais[1] in all_teams else 1
+    # índices default
+    home_index = all_teams.index(times_principais[0]) if len(times_principais) > 0 and times_principais[0] in all_teams else 0
+    away_index = all_teams.index(times_principais[1]) if len(times_principais) > 1 and times_principais[1] in all_teams else 1
 
-    selected_league = st.sidebar.selectbox('Filtrar Liga:', ['Todas'] + leagues)
-    selected_home_team = st.sidebar.selectbox(
-        'Time da Casa:', all_teams, index=home_index)
-    selected_away_team = st.sidebar.selectbox(
-        'Time Visitante:', all_teams, index=away_index)
+    selected_home_team = st.sidebar.selectbox("Time da Casa:", all_teams, index=home_index)
+    selected_away_team = st.sidebar.selectbox("Time Visitante:", all_teams, index=away_index)
 
-    # Filtro de Cenário
+    # Validação para não permitir o mesmo time
+    if selected_home_team == selected_away_team:
+        st.sidebar.error("O time da casa e o visitante não podem ser iguais.")
+        st.stop()
+
+    # ✅ Filtro de Cenário
     selected_scenario = st.sidebar.selectbox(
-        'Cenário de Análise:',
-        ['Geral', 'Casa/Fora'],
+        "Cenário de Análise:",
+        ["Geral", "Casa/Fora"],
         help="Geral: analisa todos os jogos de cada time. Casa/Fora: analisa apenas jogos em casa do mandante e fora do visitante."
     )
 
@@ -212,9 +186,9 @@ if not df.empty:
         st.markdown("### 📅 Intervalo de Jogos")
         intervalo = st.radio(
             "",
-            options=["Últimos 5 jogos", "Últimos 8 jogos",
-                     "Últimos 10 jogos", "Últimos 12 jogos"],
-            index=2,
+            options=["Últimos 5 jogos", "Últimos 6 jogos",
+                     "Últimos 8 jogos", "Últimos 10 jogos"],
+            index=3,
             horizontal=True
         )
     num_jogos_selecionado = int(intervalo.split()[1])
