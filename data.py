@@ -1,15 +1,6 @@
 import pandas as pd
-import streamlit as st
-import re
 from scipy.stats import poisson
-import requests
-from bs4 import BeautifulSoup
-import time
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.options import Options
+
 
 def drop_reset_index(df):
     df = df.dropna()

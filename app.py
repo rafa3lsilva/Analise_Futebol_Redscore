@@ -4,8 +4,6 @@ import altair as alt
 import data as dt
 import sidebar as sb
 import logging
-import time
-import os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -93,7 +91,7 @@ if not df.empty:
     div[role='radiogroup'] > label {
         background-color: #262730;
         color: white;
-        margin-top: -60px;
+        margin-top: 5px;
         border-radius: 12px;
         padding: 4px 12px;
         margin-right: 8px;
@@ -244,19 +242,19 @@ if not df.empty:
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
-        <div style="background-color:#1f77b4; padding:15px; border-radius:8px; text-align:center; color:white;">
+        <div style="background-color:#1f77b4; padding:5px; border-radius:8px; text-align:center; color:white;">
             <h3>🏠 {home_team}</h3>
-            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_home_gols_marcados:.2f}</strong></p>
-            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_home_gols_sofridos:.2f}</strong></p>
+            <p style="font-size:16px;">⚽ Média de Gols Marcados: <strong>{media_home_gols_marcados:.2f}</strong></p>
+            <p style="font-size:16px;">🛡️ Média de Gols Sofridos: <strong>{media_home_gols_sofridos:.2f}</strong></p>
         </div>
         """, unsafe_allow_html=True)
 
     with col2:
         st.markdown(f"""
-        <div style="background-color:#d62728; padding:15px; border-radius:8px; text-align:center; color:white;">
+        <div style="background-color:#d62728; padding:5px; border-radius:8px; text-align:center; color:white;">
             <h3>✈️ {away_team}</h3>
-            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_away_gols_marcados:.2f}</strong></p>
-            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_away_gols_sofridos:.2f}</strong></p>
+            <p style="font-size:16px;">⚽ Média de Gols Marcados: <strong>{media_away_gols_marcados:.2f}</strong></p>
+            <p style="font-size:16px;">🛡️ Média de Gols Sofridos: <strong>{media_away_gols_sofridos:.2f}</strong></p>
         </div>
         <br>
         """, unsafe_allow_html=True)
