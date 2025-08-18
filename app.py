@@ -151,19 +151,51 @@ if not df.empty:
     if selected_league != "Todas":
         df_filtrado = df_filtrado[df_filtrado["Liga"] == selected_league]
 
-    # ✅ Filtro de Times (dependente da liga escolhida)
-    all_teams = sorted(pd.unique(df_filtrado[['Home', 'Away']].values.ravel('K')))
+    # ✅ Filtro de Times (Lógica de Temporada - Robusto para qualquer liga)
+    # 1. Cria um DataFrame vazio como fallback
+    df_times_atuais = pd.DataFrame()
+    all_teams = []
 
-    # lógica para identificar os times principais
-    contagem_times = pd.concat([df_filtrado['Home'], df_filtrado['Away']]).value_counts()
-    times_principais = contagem_times.nlargest(2).index.tolist()
+    # 2. Garante que há dados para processar
+    if not df_filtrado.empty:
+        # Garante que a coluna de data está no formato datetime do pandas
+        df_filtrado['Data'] = pd.to_datetime(
+            df_filtrado['Data'], errors='coerce')
 
-    # índices default
-    home_index = all_teams.index(times_principais[0]) if len(times_principais) > 0 and times_principais[0] in all_teams else 0
-    away_index = all_teams.index(times_principais[1]) if len(times_principais) > 1 and times_principais[1] in all_teams else 1
+        # 3. Encontra a data do jogo mais recente na liga
+        data_mais_recente = df_filtrado['Data'].max()
 
-    selected_home_team = st.sidebar.selectbox("Time da Casa:", all_teams, index=home_index)
-    selected_away_team = st.sidebar.selectbox("Time Visitante:", all_teams, index=away_index)
+        # 4. Define a data de corte (11 meses atrás) para simular a temporada
+        # Usamos 11 meses para ter uma margem de segurança e cobrir toda a temporada
+        data_inicio_temporada = data_mais_recente - pd.DateOffset(months=8)
+
+        # 5. Filtra o DataFrame para obter apenas os jogos dessa "temporada"
+        df_times_atuais = df_filtrado[df_filtrado['Data']
+                                      > data_inicio_temporada]
+
+    # 6. Gera a lista de times únicos a partir dos dados da temporada mais recente
+    if not df_times_atuais.empty:
+        all_teams = sorted(
+            pd.unique(df_times_atuais[['Home', 'Away']].values.ravel('K')))
+
+    # Lógica para identificar os times principais (baseada nos times atuais)
+    if all_teams:
+        contagem_times = pd.concat(
+            [df_times_atuais['Home'], df_times_atuais['Away']]).value_counts()
+        times_principais = contagem_times.nlargest(2).index.tolist()
+
+        home_index = all_teams.index(times_principais[0]) if len(
+            times_principais) > 0 and times_principais[0] in all_teams else 0
+        away_index = all_teams.index(times_principais[1]) if len(
+            times_principais) > 1 and times_principais[1] in all_teams else 1
+    else:
+        home_index = 0
+        away_index = 0
+
+    selected_home_team = st.sidebar.selectbox(
+        "Time da Casa:", all_teams, index=home_index)
+    selected_away_team = st.sidebar.selectbox(
+        "Time Visitante:", all_teams, index=away_index)
 
     # Validação para não permitir o mesmo time
     if selected_home_team == selected_away_team:
