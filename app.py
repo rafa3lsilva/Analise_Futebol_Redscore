@@ -471,58 +471,75 @@ if not df.empty:
         if col_index == num_colunas - 1 and i < len(df_escanteios) - 1:
             cols = st.columns(num_colunas)
     st.markdown("---")
-    
-    # filtro para exibir os últimos jogos (Home)
-    st.write(f"### Últimos {num_jogos_selecionado} jogos do {home_team}:")
-    st.dataframe(dt.drop_reset_index(df_home))
 
-    # filtro para exibir os últimos jogos (Away)
-    st.write(f"### Últimos {num_jogos_selecionado} jogos do {away_team}:")
-    st.dataframe(dt.drop_reset_index(df_away))
+    def auto_height(df, base=35, header=40, max_height=500):
+        # Calcula altura automática da tabela
+        return min(len(df) * base + header, max_height)
 
-    # seção para upload de novo arquivo
-    if st.sidebar.button("🔄 Novo Arquivo"):
-        # 1. Extrai os dados dos mercados e escanteios...
-        prob_over_1_5 = df_resultado_mercados.loc[df_resultado_mercados['Mercado']
-                                                == 'Over 1.5', 'Probabilidade (%)'].iloc[0]
-        prob_over_2_5 = df_resultado_mercados.loc[df_resultado_mercados['Mercado']
-                                                == 'Over 2.5', 'Probabilidade (%)'].iloc[0]
-        prob_btts = df_resultado_mercados.loc[df_resultado_mercados['Mercado']
-                                            == 'BTTS', 'Probabilidade (%)'].iloc[0]
+    # remove colunas indesejadas
+    cols_to_show = [c for c in df_home.columns if c not in ["Pais", "resultado"]]
+    col1, col2 = st.columns(2)
 
-        df_escanteios = pd.DataFrame(
-            resultado_escanteios['Probabilidades por Mercado'])
-        linha_mais_provavel = df_escanteios.loc[df_escanteios['Probabilidade (%)'].idxmax(
-        )]
-        linha_escanteio_str = f"{linha_mais_provavel['Mercado']} ({linha_mais_provavel['Probabilidade (%)']:.1f}%)"
+    with col1:
+        st.markdown(f"### 🏠 Últimos {num_jogos_selecionado} jogos do **{home_team}**")
+        st.dataframe(
+            df_home[cols_to_show].reset_index(drop=True),
+            use_container_width=True,
+            height=auto_height(df_home),
+            hide_index=True
+        )
 
-        # 2. Dicionário da análise
-        current_analysis = {
-            # ... (todos os seus campos para salvar, como "Liga", "Time da Casa", etc.)
-            "Liga": selected_league,
-            "Time da Casa": home_team,
-            "Time Visitante": away_team,
-            "Cenário": selected_scenario,
-            "Jogos Analisados": f"{len(df_home)} vs {len(df_away)}",
-            "Prob. Casa (%)": prob_home,
-            "Prob. Empate (%)": prob_draw,
-            "Prob. Visitante (%)": prob_away,
-            "Prob. Gol HT (%)": round(analise_ht_nova['probabilidade'], 2),
-            "Odd Justa Gol HT": round(analise_ht_nova['odd_justa'], 2),
-            "Prob. Over 1.5 (%)": prob_over_1_5,
-            "Prob. Over 2.5 (%)": prob_over_2_5,
-            "Prob. BTTS (%)": prob_btts,
-            "Melhor Linha Escanteios": linha_escanteio_str,
-        }
+    with col2:
+        st.markdown(f"### ✈️ Últimos {num_jogos_selecionado} jogos do **{away_team}**")
+        st.dataframe(
+            df_away[cols_to_show].reset_index(drop=True),
+            use_container_width=True,
+            height=auto_height(df_away),
+            hide_index=True
+    )
 
-        # 3. Adiciona ao relatório, limpa o estado e reinicia
-        st.session_state.saved_analyses.append(current_analysis)
-        st.toast(f"Análise de '{home_team} vs {away_team}' salva no relatório!")
+    # --- Botão para salvar análise atual ---
+if st.sidebar.button("💾 Salvar Análise Atual"):
+    # 1. Extrai os dados dos mercados e escanteios
+    prob_over_1_5 = df_resultado_mercados.loc[
+        df_resultado_mercados['Mercado'] == 'Over 1.5', 'Probabilidade (%)'
+    ].iloc[0]
+    prob_over_2_5 = df_resultado_mercados.loc[
+        df_resultado_mercados['Mercado'] == 'Over 2.5', 'Probabilidade (%)'
+    ].iloc[0]
+    prob_btts = df_resultado_mercados.loc[
+        df_resultado_mercados['Mercado'] == 'BTTS', 'Probabilidade (%)'
+    ].iloc[0]
 
-        st.session_state.dados_jogos = None
-        st.session_state.df_jogos = pd.DataFrame()
-        st.rerun()
+    df_escanteios = pd.DataFrame(resultado_escanteios['Probabilidades por Mercado'])
+    linha_mais_provavel = df_escanteios.loc[df_escanteios['Probabilidade (%)'].idxmax()]
+    linha_escanteio_str = f"{linha_mais_provavel['Mercado']} ({linha_mais_provavel['Probabilidade (%)']:.1f}%)"
 
+    # 2. Monta dicionário da análise
+    current_analysis = {
+        "País": selected_country,
+        "Liga": selected_league,
+        "Time da Casa": home_team,
+        "Time Visitante": away_team,
+        "Cenário": selected_scenario,
+        "Jogos Analisados": f"{len(df_home)} vs {len(df_away)}",
+        "Prob. Casa (%)": prob_home,
+        "Prob. Empate (%)": prob_draw,
+        "Prob. Visitante (%)": prob_away,
+        "Prob. Gol HT (%)": round(analise_ht_nova['probabilidade'], 2),
+        "Odd Justa Gol HT": round(analise_ht_nova['odd_justa'], 2),
+        "Prob. Over 1.5 (%)": prob_over_1_5,
+        "Prob. Over 2.5 (%)": prob_over_2_5,
+        "Prob. BTTS (%)": prob_btts,
+        "Melhor Linha Escanteios": linha_escanteio_str,
+    }
+
+    # 3. Salva no relatório
+    st.session_state.saved_analyses.append(current_analysis)
+    st.toast(f"✅ Análise de '{home_team} vs {away_team}' salva no relatório!")
+
+
+# --- Relatório de análises salvas ---
 if st.session_state.saved_analyses:
     st.sidebar.markdown("---")
     st.sidebar.header("📋 Relatório de Análises")
@@ -539,21 +556,20 @@ if st.session_state.saved_analyses:
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             df.to_excel(writer, index=False, sheet_name='Analises')
-        processed_data = output.getvalue()
-        return processed_data
+        return output.getvalue()
 
     excel_data = to_excel(df_report)
 
-    # Botão de download (agora visível)
+    # Botão de download
     st.sidebar.download_button(
-        label="📥 Descarregar Relatório (Excel)",
+        label="📥 Baixar Relatório (Excel)",
         data=excel_data,
         file_name="relatorio_analises.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
     # Botão para limpar
-    if st.sidebar.button("Limpar Análises Salvas"):
+    if st.sidebar.button("🗑️ Limpar Análises Salvas"):
         st.session_state.saved_analyses = []
         st.rerun()
 
