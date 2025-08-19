@@ -597,19 +597,18 @@ if st.sidebar.button("💾 Salvar Análise Atual"):
     current_analysis = {
         "País": selected_country,
         "Liga": selected_league,
-        "Time da Casa": home_team,
-        "Time Visitante": away_team,
+        "Home": home_team,
+        "Away": away_team,
         "Cenário": selected_scenario,
         "Jogos Analisados": f"{len(df_home)} vs {len(df_away)}",
         "Prob. Casa (%)": prob_home,
         "Prob. Empate (%)": prob_draw,
         "Prob. Visitante (%)": prob_away,
         "Prob. Gol HT (%)": round(analise_ht_nova['probabilidade'], 2),
-        "Odd Justa Gol HT": round(analise_ht_nova['odd_justa'], 2),
         "Prob. Over 1.5 (%)": prob_over_1_5,
         "Prob. Over 2.5 (%)": prob_over_2_5,
         "Prob. BTTS (%)": prob_btts,
-        "Melhor Linha Escanteios": linha_escanteio_str,
+        "Linha Escanteios": linha_escanteio_str,
     }
 
     # 3. Salva no relatório
