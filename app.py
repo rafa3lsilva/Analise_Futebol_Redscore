@@ -241,7 +241,7 @@ if not df.empty:
             "",
             options=["Últimos 5 jogos", "Últimos 6 jogos",
                      "Últimos 8 jogos", "Últimos 10 jogos"],
-            index=3,
+            index=1,
             horizontal=True
         )
     num_jogos_selecionado = int(intervalo.split()[1])
@@ -440,18 +440,18 @@ if not df.empty:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"**Análise de {home_team} (Casa):**")
+        st.markdown(f"**Análise de {home_team}:**")
         st.info(
-            f"Marcou gol no HT em **{analise_ht_antiga['home_marca']:.1f}%** dos seus jogos em casa.")
+            f"Marcou gol no HT em **{analise_ht_antiga['home_marca']:.1f}%** dos seus jogos.")
         st.warning(
-            f"Sofreu gol no HT em **{analise_ht_antiga['home_sofre']:.1f}%** dos seus jogos em casa.")
+            f"Sofreu gol no HT em **{analise_ht_antiga['home_sofre']:.1f}%** dos seus jogos.")
 
     with col2:
-        st.markdown(f"**Análise de {away_team} (Fora):**")
+        st.markdown(f"**Análise de {away_team}:**")
         st.info(
-            f"Marcou gol no HT em **{analise_ht_antiga['away_marca']:.1f}%** dos seus jogos fora.")
+            f"Marcou gol no HT em **{analise_ht_antiga['away_marca']:.1f}%** dos seus jogos.")
         st.warning(
-            f"Sofreu gol no HT em **{analise_ht_antiga['away_sofre']:.1f}%** dos seus jogos fora.")
+            f"Sofreu gol no HT em **{analise_ht_antiga['away_sofre']:.1f}%** dos seus jogos.")
 
     st.markdown("---")
     
@@ -460,17 +460,43 @@ if not df.empty:
 
     df_resultado_mercados = dt.analisar_mercados(df_home_final, df_away_final)
 
-    # Cartões separados
-    st.subheader("🎯 Probabilidades por Mercado")
-    cols = st.columns(len(df_resultado_mercados))
+    st.subheader(
+        "🎯 Probabilidades por Mercado 🔎 Comparador de Valor (Value Bet)")
 
-    for i, col in enumerate(cols):
+# Cria colunas para cada mercado (Over 1.5, Over 2.5, BTTS)
+cols = st.columns(len(df_resultado_mercados))
+
+# Itera sobre cada coluna e cada mercado correspondente
+for i, col in enumerate(cols):
+    with col:
+        # Pega os dados do mercado atual (Over 1.5, Over 2.5, etc.)
         mercado = df_resultado_mercados.iloc[i]
-        col.metric(
+
+        # Exibe a métrica com a probabilidade e a odd justa, como antes
+        st.metric(
             label=mercado["Mercado"],
             value=f'{mercado["Probabilidade (%)"]}%',
             delta=f'Odd Justa: {mercado["Odd Justa"]}'
         )
+
+        # Adiciona o campo para o utilizador inserir a odd do mercado
+        odd_mercado = st.number_input(
+            f"Odd Mercado para {mercado['Mercado']}",
+            min_value=1.00,
+            # Usa a odd justa como valor inicial para facilitar
+            value=float(mercado['Odd Justa']),
+            step=0.01,
+            format="%.2f",
+            # A 'key' é essencial para que cada campo seja único
+            key=f"odd_mercado_{mercado['Mercado']}"
+        )
+
+        # Lógica para comparar e exibir se há valor
+        if odd_mercado > mercado['Odd Justa']:
+            valor_ev = (odd_mercado / mercado['Odd Justa'] - 1) * 100
+            st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
+        else:
+            st.warning("Sem valor aparente.")
 
     # Gráfico de barras
     st.subheader("📈 Visualização Gráfica")
