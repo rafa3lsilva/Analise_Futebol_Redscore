@@ -463,40 +463,40 @@ if not df.empty:
     st.subheader(
         "🎯 Probabilidades por Mercado 🔎 Comparador de Valor (Value Bet)")
 
-# Cria colunas para cada mercado (Over 1.5, Over 2.5, BTTS)
-cols = st.columns(len(df_resultado_mercados))
+    # Cria colunas para cada mercado (Over 1.5, Over 2.5, BTTS)
+    cols = st.columns(len(df_resultado_mercados))
 
-# Itera sobre cada coluna e cada mercado correspondente
-for i, col in enumerate(cols):
-    with col:
-        # Pega os dados do mercado atual (Over 1.5, Over 2.5, etc.)
-        mercado = df_resultado_mercados.iloc[i]
+    # Itera sobre cada coluna e cada mercado correspondente
+    for i, col in enumerate(cols):
+        with col:
+            # Pega os dados do mercado atual (Over 1.5, Over 2.5, etc.)
+            mercado = df_resultado_mercados.iloc[i]
 
-        # Exibe a métrica com a probabilidade e a odd justa, como antes
-        st.metric(
-            label=mercado["Mercado"],
-            value=f'{mercado["Probabilidade (%)"]}%',
-            delta=f'Odd Justa: {mercado["Odd Justa"]}'
-        )
+            # Exibe a métrica com a probabilidade e a odd justa, como antes
+            st.metric(
+                label=mercado["Mercado"],
+                value=f'{mercado["Probabilidade (%)"]}%',
+                delta=f'Odd Justa: {mercado["Odd Justa"]}'
+            )
 
-        # Adiciona o campo para o utilizador inserir a odd do mercado
-        odd_mercado = st.number_input(
-            f"Odd Mercado para {mercado['Mercado']}",
-            min_value=1.00,
-            # Usa a odd justa como valor inicial para facilitar
-            value=float(mercado['Odd Justa']),
-            step=0.01,
-            format="%.2f",
-            # A 'key' é essencial para que cada campo seja único
-            key=f"odd_mercado_{mercado['Mercado']}"
-        )
+            # Adiciona o campo para o utilizador inserir a odd do mercado
+            odd_mercado = st.number_input(
+                f"Odd Mercado para {mercado['Mercado']}",
+                min_value=1.00,
+                # Usa a odd justa como valor inicial para facilitar
+                value=float(mercado['Odd Justa']),
+                step=0.01,
+                format="%.2f",
+                # A 'key' é essencial para que cada campo seja único
+                key=f"odd_mercado_{mercado['Mercado']}"
+            )
 
-        # Lógica para comparar e exibir se há valor
-        if odd_mercado > mercado['Odd Justa']:
-            valor_ev = (odd_mercado / mercado['Odd Justa'] - 1) * 100
-            st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
-        else:
-            st.warning("Sem valor aparente.")
+            # Lógica para comparar e exibir se há valor
+            if odd_mercado > mercado['Odd Justa']:
+                valor_ev = (odd_mercado / mercado['Odd Justa'] - 1) * 100
+                st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
+            else:
+                st.warning("Sem valor aparente.")
 
     # Gráfico de barras
     st.subheader("📈 Visualização Gráfica")
