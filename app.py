@@ -14,10 +14,14 @@ if "data_loaded_successfully" not in st.session_state:
 if "saved_analyses" not in st.session_state:
     st.session_state.saved_analyses = []
 
-if "dados_jogos" not in st.session_state:
-    st.session_state.dados_jogos = None
 if "df_jogos" not in st.session_state:
     st.session_state.df_jogos = pd.DataFrame()
+
+if 'dados_historicos_carregados' not in st.session_state:
+    st.session_state.dados_historicos_carregados = False
+
+if 'jogos_futuros_carregados' not in st.session_state:
+    st.session_state.jogos_futuros_carregados = False
 
 # Função para configurar a página Streamlit
 st.set_page_config(
@@ -48,63 +52,68 @@ st.markdown("""
 # Importa a barra lateral
 sb.sidebar()
 
-# Inicializa o estado
-if "dados_jogos" not in st.session_state:
-    st.session_state.dados_jogos = None
-if "df_jogos" not in st.session_state:
-    st.session_state.df_jogos = pd.DataFrame()
-
 # Carrega dados do github
 URL_DADOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
+URL_JOGOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/proximos_jogos.csv"
 df_jogos = pd.DataFrame()
+df_proximos_jogos = pd.DataFrame()
 
 try:
+    # --- Carregamento de dados históricos ---
     df_jogos = pd.read_csv(URL_DADOS)
-
-    # Guarda o número de linhas antes de qualquer alteração
     num_linhas_original = len(df_jogos)
-
-    # Converte a coluna 'Data'
     df_jogos['Data'] = pd.to_datetime(
-        df_jogos['Data'], format="%d-%m-%Y", errors="coerce"
-    )
+        df_jogos['Data'], format="%d-%m-%Y", errors="coerce")
 
-    # Verifica se alguma data falhou na conversão (tornou-se NaT/null)
     jogos_com_data_invalida = df_jogos['Data'].isnull().sum()
 
-    if jogos_com_data_invalida > 0:
-        # Mostra um aviso ao utilizador na interface
-        st.warning(
-            f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
-            f"não estava no formato esperado (DD-MM-AAAA)."
-        )
-        # Remove as linhas com datas inválidas para não afetar as análises
-        df_jogos.dropna(subset=['Data'], inplace=True)
-
+    if not st.session_state.dados_historicos_carregados:
+        if jogos_com_data_invalida > 0:
+            st.warning(
+                f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
+                f"não estava no formato esperado (DD-MM-AAAA)."
+            )
+    df_jogos.dropna(subset=['Data'], inplace=True)
+    st.toast(
+        f"Base de dados carregada com {len(df_jogos)} jogos!", icon="✅")
+    st.session_state.dados_historicos_carregados = True
     df_jogos['Data'] = df_jogos['Data'].dt.date
     df_jogos = df_jogos.sort_values(
         by="Data", ascending=False
     ).reset_index(drop=True)
 
-    # ✅ Atualiza session_state
-    st.session_state.df_jogos = df_jogos
+    # --- Carregamento de jogos futuros ---
+    df_proximos_jogos = pd.read_csv(URL_JOGOS)
+    # Guarda o número de linhas antes de qualquer alteração
+    num_linhas_original_proximos = len(df_proximos_jogos)
+    df_proximos_jogos['Data'] = pd.to_datetime(
+        df_proximos_jogos['Data'], format="%d-%m-%Y", errors="coerce"
+    )
 
-    # Verifica se os dados ainda não foram carregados com sucesso nesta sessão
-    if not st.session_state.data_loaded_successfully:
-        # Mostra uma notificação temporária
-        st.toast(
-            f"Base de dados carregada com {len(df_jogos)} jogos!",
-            icon="✅"
-        )
-        # Marca que os dados foram carregados com sucesso.
-        st.session_state.data_loaded_successfully = True
+    jogos_com_data_invalida_proximos = df_proximos_jogos['Data'].isnull().sum()
+
+    if not st.session_state.jogos_futuros_carregados:
+        if jogos_com_data_invalida_proximos > 0:
+            st.warning(
+                f"Atenção: {jogos_com_data_invalida_proximos} jogo(s) foram ignorados porque a data "
+                f"não estava no formato esperado (DD-MM-AAAA)."
+            )
+    df_proximos_jogos.dropna(subset=['Data'], inplace=True)
+    st.toast(
+        f"Carregados {len(df_proximos_jogos)} jogos futuros!", icon="📅")
+    st.session_state.jogos_futuros_carregados = True
+    df_proximos_jogos['Data'] = df_proximos_jogos['Data'].dt.date
+    df_proximos_jogos = df_proximos_jogos.sort_values(
+        by="Data", ascending=False
+    ).reset_index(drop=True)
 
 except Exception as e:
-    st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
+    st.error(f"Erro ao carregar os dados: {e}")
     st.stop()
 
 # separa coluna "Liga" em duas: Pais e Liga
 df_jogos[['Pais', 'Liga']] = df_jogos['Liga'].str.split(" - ", n=1, expand=True)
+df_proximos_jogos[['Pais', 'Liga']] = df_proximos_jogos['Liga'].str.split(" - ", n=1, expand=True)
 
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
