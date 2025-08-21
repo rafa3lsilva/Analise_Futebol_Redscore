@@ -31,6 +31,16 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Função auxiliar para separar a liga de forma segura
+def separar_pais_liga(nome_completo):
+    if " - " in nome_completo:
+        # Divide e retorna o país e a liga
+        partes = nome_completo.split(" - ", 1)
+        return pd.Series([partes[0], partes[1]])
+    else:
+        # Se não encontrar o separador, retorna 'N/A' para o país
+        # e mantém o nome original para a liga
+        return pd.Series(["N/A", nome_completo])
 st.markdown(
     """
     <h1 style='display: flex; align-items: center; justify-content: center; text-align: center;'>
@@ -58,62 +68,67 @@ URL_JOGOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore
 df_jogos = pd.DataFrame()
 df_proximos_jogos = pd.DataFrame()
 
-try:
-    # --- Carregamento de dados históricos ---
-    df_jogos = pd.read_csv(URL_DADOS)
-    num_linhas_original = len(df_jogos)
-    df_jogos['Data'] = pd.to_datetime(
-        df_jogos['Data'], format="%d-%m-%Y", errors="coerce")
+df_jogos = pd.read_csv(URL_DADOS)
 
+# Guarda o número de linhas antes de qualquer alteração
+num_linhas_original = len(df_jogos)
+try:
+    df_jogos = pd.read_csv(URL_DADOS)
+
+    # Guarda o número de linhas antes de qualquer alteração
+    num_linhas_original = len(df_jogos)
+
+    # Converte a coluna 'Data'
+    df_jogos['Data'] = pd.to_datetime(
+        df_jogos['Data'], format="%d-%m-%Y", errors="coerce"
+    )
+
+    # Verifica se alguma data falhou na conversão (tornou-se NaT/null)
     jogos_com_data_invalida = df_jogos['Data'].isnull().sum()
 
-    if not st.session_state.dados_historicos_carregados:
-        if jogos_com_data_invalida > 0:
-            st.warning(
-                f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
-                f"não estava no formato esperado (DD-MM-AAAA)."
-            )
-    df_jogos.dropna(subset=['Data'], inplace=True)
-    st.toast(
-        f"Base de dados carregada com {len(df_jogos)} jogos!", icon="✅")
-    st.session_state.dados_historicos_carregados = True
+    if jogos_com_data_invalida > 0:
+        # Mostra um aviso ao utilizador na interface
+        st.warning(
+            f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
+            f"não estava no formato esperado (DD-MM-AAAA)."
+        )
+        # Remove as linhas com datas inválidas para não afetar as análises
+        df_jogos.dropna(subset=['Data'], inplace=True)
+
     df_jogos['Data'] = df_jogos['Data'].dt.date
     df_jogos = df_jogos.sort_values(
         by="Data", ascending=False
     ).reset_index(drop=True)
 
-    # --- Carregamento de jogos futuros ---
-    df_proximos_jogos = pd.read_csv(URL_JOGOS)
-    # Guarda o número de linhas antes de qualquer alteração
-    num_linhas_original_proximos = len(df_proximos_jogos)
-    df_proximos_jogos['Data'] = pd.to_datetime(
-        df_proximos_jogos['Data'], format="%d-%m-%Y", errors="coerce"
-    )
+    # ✅ Atualiza session_state
+    st.session_state.df_jogos = df_jogos
 
-    jogos_com_data_invalida_proximos = df_proximos_jogos['Data'].isnull().sum()
-
-    if not st.session_state.jogos_futuros_carregados:
-        if jogos_com_data_invalida_proximos > 0:
-            st.warning(
-                f"Atenção: {jogos_com_data_invalida_proximos} jogo(s) foram ignorados porque a data "
-                f"não estava no formato esperado (DD-MM-AAAA)."
-            )
-    df_proximos_jogos.dropna(subset=['Data'], inplace=True)
-    st.toast(
-        f"Carregados {len(df_proximos_jogos)} jogos futuros!", icon="📅")
-    st.session_state.jogos_futuros_carregados = True
-    df_proximos_jogos['Data'] = df_proximos_jogos['Data'].dt.date
-    df_proximos_jogos = df_proximos_jogos.sort_values(
-        by="Data", ascending=False
-    ).reset_index(drop=True)
+    # Verifica se os dados ainda não foram carregados com sucesso nesta sessão
+    if not st.session_state.data_loaded_successfully:
+        # Mostra uma notificação temporária
+        st.toast(
+            f"Base de dados carregada com {len(df_jogos)} jogos!",
+            icon="✅"
+        )
+        # Marca que os dados foram carregados com sucesso.
+        st.session_state.data_loaded_successfully = True
 
 except Exception as e:
-    st.error(f"Erro ao carregar os dados: {e}")
+    st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
     st.stop()
 
+# --- Carregamento de jogos futuros ---
+df_proximos_jogos = pd.read_csv(URL_JOGOS)
+num_linhas_original_proximos = len(df_proximos_jogos)
+
+
+
 # separa coluna "Liga" em duas: Pais e Liga
-df_jogos[['Pais', 'Liga']] = df_jogos['Liga'].str.split(" - ", n=1, expand=True)
-df_proximos_jogos[['Pais', 'Liga']] = df_proximos_jogos['Liga'].str.split(" - ", n=1, expand=True)
+df_jogos[['Pais', 'Liga']] = df_jogos['Liga'].apply(separar_pais_liga)
+# Criar coluna "confronto" para jogos futuros
+df_proximos_jogos['confronto'] = df_proximos_jogos['home'] + ' vs ' + df_proximos_jogos['away']
+condicao = df_proximos_jogos['hora'].str.match(r'^\d{2}:\d{2}$')
+jogos_filtrado = df_proximos_jogos[condicao]
 
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
@@ -145,6 +160,25 @@ if not df.empty:
     # --- Bloco de Filtros da Sidebar ---
     st.sidebar.markdown("### Filtros da Análise")
 
+    selected_time = st.sidebar.selectbox(
+        "Selecione o Horário:", jogos_filtrado['hora'].unique())
+    filtered_by_time = jogos_filtrado[jogos_filtrado['hora'] == selected_time]
+
+    selected_league = st.sidebar.selectbox(
+        "Selecione a Liga:", filtered_by_time['liga'].unique())
+    filtered_by_league = filtered_by_time[filtered_by_time['liga']
+                                          == selected_league]
+    
+    selected_game = st.sidebar.selectbox(
+        "Escolha o Jogo:", filtered_by_league['confronto'].unique())
+
+    st.write(jogos_filtrado[['liga', 'hora', 'confronto']])
+    selected_game_data = filtered_by_league[filtered_by_league['confronto']
+                                            == selected_game]
+    st.write('**Jogo Selecionado:**')
+    st.write(selected_game_data[['liga', 'hora', 'home', 'away', 'odd_h', 'odd_d', 'odd_a']])
+
+    
     # ✅ Filtro de País
     paises = sorted(df['Pais'].unique())
     selected_country = st.sidebar.selectbox("Filtrar País:", ["Todos"] + paises)
