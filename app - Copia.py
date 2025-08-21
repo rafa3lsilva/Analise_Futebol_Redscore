@@ -139,6 +139,17 @@ except Exception as e:
     st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
     st.stop()
 
+# --- Carregamento de jogos futuros ---
+df_proximos_jogos = pd.read_csv(URL_JOGOS)
+num_linhas_original_proximos = len(df_proximos_jogos)
+
+# separa coluna "Liga" em duas: Pais e Liga
+df_jogos[['Pais', 'Liga']] = df_jogos['Liga'].apply(separar_pais_liga)
+# Criar coluna "confronto" para jogos futuros
+df_proximos_jogos['confronto'] = df_proximos_jogos['home'] + ' vs ' + df_proximos_jogos['away']
+condicao = df_proximos_jogos['hora'].str.match(r'^\d{2}:\d{2}$')
+jogos_filtrado = df_proximos_jogos[condicao]
+
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
 if not df.empty:
@@ -165,67 +176,128 @@ if not df.empty:
     </style>
     """, unsafe_allow_html=True)
 
-df = st.session_state.df_jogos
-df_proximos = st.session_state.df_proximos_jogos
+if not df.empty:
+    # --- Bloco de Filtros da Sidebar ---
+    st.sidebar.markdown("### Filtros da Análise")
 
-if not df.empty and not df_proximos.empty:
-    # --- NOVO FLUXO DE FILTROS NA SIDEBAR (BASEADO NOS PRÓXIMOS JOGOS) ---
-    st.sidebar.markdown("### 🔎 Análise de Próximos Jogos")
-
-    # Filtro 1: Hora
-    horarios_disponiveis = sorted(df_proximos['hora'].unique())
     selected_time = st.sidebar.selectbox(
-        "Selecione o Horário:", horarios_disponiveis)
+        "Selecione o Horário:", jogos_filtrado['hora'].unique())
+    filtered_by_time = jogos_filtrado[jogos_filtrado['hora'] == selected_time]
 
-    # Filtra os dados com base na hora selecionada
-    jogos_filtrado_hora = df_proximos[df_proximos['hora'] == selected_time]
-
-    # Filtro 2: Liga (as opções dependem da hora escolhida)
-    ligas_disponiveis = sorted(jogos_filtrado_hora['liga'].unique())
     selected_league = st.sidebar.selectbox(
-        "Selecione a Liga:", ligas_disponiveis)
-
-    # Filtra novamente com base na liga
-    jogos_filtrado_liga = jogos_filtrado_hora[jogos_filtrado_hora['liga']
-                                              == selected_league]
-
-    # Filtro 3: Confronto (as opções dependem da hora e da liga)
-    confrontos_disponiveis = sorted(jogos_filtrado_liga['confronto'].unique())
+        "Selecione a Liga:", filtered_by_time['liga'].unique())
+    filtered_by_league = filtered_by_time[filtered_by_time['liga']
+                                          == selected_league]
+    
     selected_game = st.sidebar.selectbox(
-        "Escolha o Jogo:", confrontos_disponiveis)
+        "Escolha o Jogo:", filtered_by_league['confronto'].unique())
 
-    # Com base na seleção, extrai os nomes das equipas para a análise
-    selected_game_data = jogos_filtrado_liga[jogos_filtrado_liga['confronto'] == selected_game]
+    st.write(jogos_filtrado[['liga', 'hora', 'confronto']])
+    selected_game_data = filtered_by_league[filtered_by_league['confronto']
+                                            == selected_game]
+    st.write('**Jogo Selecionado:**')
+    st.write(selected_game_data[['liga', 'hora', 'home', 'away', 'odd_h', 'odd_d', 'odd_a']])
 
-    if selected_game_data.empty:
-        st.warning("Por favor, selecione um jogo válido para iniciar a análise.")
+    
+    # ✅ Filtro de País
+    paises = sorted(df['Pais'].unique())
+    selected_country = st.sidebar.selectbox("Filtrar País:", ["Todos"] + paises)
+
+    df_filtrado = df.copy()
+    if selected_country != "Todos":
+        df_filtrado = df_filtrado[df_filtrado["Pais"] == selected_country]
+
+    # ✅ Filtro de Liga (dependente do país)
+    ligas = sorted(df_filtrado['Liga'].unique())
+    selected_league = st.sidebar.selectbox("Filtrar Liga:", ["Todas"] + ligas)
+
+    if selected_league != "Todas":
+        df_filtrado = df_filtrado[df_filtrado["Liga"] == selected_league]
+
+    # ✅ Filtro de Times (Lógica de Temporada - Robusto para qualquer liga)
+    # 1. Cria um DataFrame vazio como fallback
+    df_times_atuais = pd.DataFrame()
+    all_teams = []
+
+    # 2. Garante que há dados para processar
+    if not df_filtrado.empty:
+        # Garante que a coluna de data está no formato datetime do pandas
+        df_filtrado['Data'] = pd.to_datetime(
+            df_filtrado['Data'], errors='coerce')
+
+        # 3. Encontra a data do jogo mais recente na liga
+        data_mais_recente = df_filtrado['Data'].max()
+
+        # 4. Define a data de corte (11 meses atrás) para simular a temporada
+        # Usamos 11 meses para ter uma margem de segurança e cobrir toda a temporada
+        data_inicio_temporada = data_mais_recente - pd.DateOffset(months=8)
+
+        # 5. Filtra o DataFrame para obter apenas os jogos dessa "temporada"
+        df_times_atuais = df_filtrado[df_filtrado['Data']
+                                      > data_inicio_temporada]
+
+    # 6. Gera a lista de times únicos a partir dos dados da temporada mais recente
+    if not df_times_atuais.empty:
+        all_teams = sorted(
+            pd.unique(df_times_atuais[['Home', 'Away']].values.ravel('K')))
+
+    # Lógica para identificar os times principais (baseada nos times atuais)
+    if all_teams:
+        contagem_times = pd.concat(
+            [df_times_atuais['Home'], df_times_atuais['Away']]).value_counts()
+        times_principais = contagem_times.nlargest(2).index.tolist()
+
+        home_index = all_teams.index(times_principais[0]) if len(
+            times_principais) > 0 and times_principais[0] in all_teams else 0
+        away_index = all_teams.index(times_principais[1]) if len(
+            times_principais) > 1 and times_principais[1] in all_teams else 1
+    else:
+        home_index = 0
+        away_index = 0
+
+    selected_home_team = st.sidebar.selectbox(
+        "Time da Casa:", all_teams, index=home_index)
+    selected_away_team = st.sidebar.selectbox(
+        "Time Visitante:", all_teams, index=away_index)
+
+    # Validação para não permitir o mesmo time
+    if selected_home_team == selected_away_team:
+        st.sidebar.error("O time da casa e o visitante não podem ser iguais.")
         st.stop()
-
-    home_team = selected_game_data['home'].iloc[0]
-    away_team = selected_game_data['away'].iloc[0]
-
-    # --- A LÓGICA QUE VOCÊ QUERIA MANTER COMEÇA AQUI ---
 
     # ✅ Filtro de Cenário
     selected_scenario = st.sidebar.selectbox(
-        "Cenário de Análise Histórica:",
+        "Cenário de Análise:",
         ["Geral", "Casa/Fora"],
         help="Geral: analisa todos os jogos de cada time. Casa/Fora: analisa apenas jogos em casa do mandante e fora do visitante."
     )
 
-    # Cria os DataFrames de dados históricos com base no cenário escolhido
-    if selected_scenario == 'Geral':
-        df_home_base = df[(df['Home'].str.lower() == home_team.lower()) | (
-            df['Away'].str.lower() == home_team.lower())].copy().reset_index(drop=True)
-        df_away_base = df[(df['Home'].str.lower() == away_team.lower()) | (
-            df['Away'].str.lower() == away_team.lower())].copy().reset_index(drop=True)
-    else:  # Cenário 'Casa/Fora'
-        df_home_base = df[df['Home'].str.lower(
-        ) == home_team.lower()].copy().reset_index(drop=True)
-        df_away_base = df[df['Away'].str.lower(
-        ) == away_team.lower()].copy().reset_index(drop=True)
+    # Validação para garantir que os times selecionados não sejam iguais
+    if selected_home_team == selected_away_team:
+        st.sidebar.error("O time da casa e o visitante não podem ser iguais.")
+        st.stop()
 
-    # --- Filtro de Intervalo de jogos ---
+    # Filtra o DataFrame principal pela liga selecionada
+    df_filtrado_liga = df.copy()
+    if selected_league != 'Todas':
+        df_filtrado_liga = df_filtrado_liga[df_filtrado_liga['Liga']
+                                            == selected_league]
+
+    # Cria os DataFrames com base no cenário escolhido
+    if selected_scenario == 'Geral':
+        # Cenário Geral: Pega todos os jogos de cada time
+        df_home_base = df_filtrado_liga[(df_filtrado_liga['Home'] == selected_home_team) | (
+            df_filtrado_liga['Away'] == selected_home_team)].copy().reset_index(drop=True)
+        df_away_base = df_filtrado_liga[(df_filtrado_liga['Home'] == selected_away_team) | (
+            df_filtrado_liga['Away'] == selected_away_team)].copy().reset_index(drop=True)
+    else:  # Cenário 'Casa/Fora'
+        # Cenário Específico: Pega apenas jogos em casa do mandante e fora do visitante
+        df_home_base = df_filtrado_liga[df_filtrado_liga['Home']
+                                        == selected_home_team].copy().reset_index(drop=True)
+        df_away_base = df_filtrado_liga[df_filtrado_liga['Away']
+                                        == selected_away_team].copy().reset_index(drop=True)
+
+    # Filtro de Intervalo de jogos
     with st.container():
         st.markdown("### 📅 Intervalo de Jogos")
         intervalo = st.radio(
@@ -241,10 +313,19 @@ if not df.empty and not df_proximos.empty:
     num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
     num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
 
-    # Pega os N primeiros jogos (os mais recentes, pois já ordenámos no início) para a análise final
+    # Pega os N primeiros jogos (os mais recentes do arquivo) para a análise final
     df_home = df_home_base.head(num_jogos_home)
     df_away = df_away_base.head(num_jogos_away)
 
+    # Define os nomes dos times para usar nos títulos das análises
+    home_team = selected_home_team
+    away_team = selected_away_team
+
+    # Validação final para garantir que há dados para analisar
+    if df_home.empty or df_away.empty:
+        st.warning(
+            "Não há dados suficientes para a análise com os filtros selecionados. Por favor, ajuste as opções.")
+        st.stop()
 
     st.sidebar.markdown("<br>",unsafe_allow_html=True)
     with st.sidebar.expander("⚙️ Ajustar Pesos do Modelo"):
@@ -577,7 +658,7 @@ if st.sidebar.button("💾 Salvar Análise Atual"):
 
     # 2. Monta dicionário da análise
     current_analysis = {
-        #"País": selected_country,
+        "País": selected_country,
         "Liga": selected_league,
         "Home": home_team,
         "Away": away_team,
