@@ -4,16 +4,22 @@ import altair as alt
 import data as dt
 import sidebar as sb
 import logging
+from datetime import datetime, timedelta, date
+import requests
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# --- INICIALIZAÇÃO DO ESTADO DA SESSÃO (UMA SÓ VEZ, NO INÍCIO) ---
 if "saved_analyses" not in st.session_state:
     st.session_state.saved_analyses = []
+if "dados_jogos" not in st.session_state:
+    st.session_state.dados_jogos = None
 if "df_jogos" not in st.session_state:
     st.session_state.df_jogos = pd.DataFrame()
-if "df_proximos_jogos" not in st.session_state:
-    st.session_state.df_proximos_jogos = pd.DataFrame()
+# Adicione esta linha se a sua lógica de toast a utilizar
+if "data_loaded_successfully" not in st.session_state:
+    st.session_state.data_loaded_successfully = False
 
 # Função para configurar a página Streamlit
 st.set_page_config(
@@ -54,38 +60,66 @@ st.markdown("""
 # Importa a barra lateral
 sb.sidebar()
 
-# Carrega dados do github
+st.sidebar.markdown("### 🔎 Filtros da Análise")
 URL_DADOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
-URL_JOGOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/proximos_jogos.csv"
+
 
 @st.cache_data
-def carregar_dados():
+def carregar_dados(data_escolhida: date):
+    """Carrega dados históricos e jogos do dia com base na data escolhida (date)."""
+
+    # Formatos
+    data_br = data_escolhida.strftime("%d/%m/%Y")   # exibição
+    data_iso = data_escolhida.strftime("%Y-%m-%d")  # nome do arquivo
+
+    # Carrega base histórica
     df_historicos = pd.read_csv(URL_DADOS)
-    df_futuros = pd.read_csv(URL_JOGOS)
 
-    # Limpeza e formatação dos dados históricos
-    df_historicos['Data'] = pd.to_datetime(df_historicos['Data'])
-    df_historicos = df_historicos.sort_values(
-        by='Data', ascending=False).reset_index(drop=True)
+    # Monta URL dos jogos do dia
+    url_jogos = f"https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/jogos_do_dia/Jogos_do_Dia_RedScore_{data_iso}.csv"
 
-    # Limpeza e formatação dos jogos futuros
-    condicao_hora_valida = df_futuros['hora'].str.match(r'^\d{2}:\d{2}$')
-    df_futuros = df_futuros[condicao_hora_valida]
-    df_futuros['confronto'] = df_futuros['home'] + ' vs ' + df_futuros['away']
+    df_futuros = pd.DataFrame()
+    try:
+        response = requests.get(url_jogos)
+        if response.status_code == 200:
+            df_futuros = pd.read_csv(url_jogos)
+            condicao_hora_valida = df_futuros['hora'].astype(
+                str).str.match(r'^\d{2}:\d{2}$')
+            df_futuros = df_futuros[condicao_hora_valida].copy()
+            df_futuros['confronto'] = df_futuros['home'] + \
+                ' x ' + df_futuros['away']
+    except Exception as e:
+        st.warning(f"Erro ao carregar jogos de {data_br}: {e}")
 
-    return df_historicos, df_futuros
+    return df_historicos, df_futuros, data_br, data_iso
 
-try:
-    df_jogos, df_proximos_jogos = carregar_dados()
-    st.session_state.df_jogos = df_jogos
-    st.session_state.df_proximos_jogos = df_proximos_jogos
-except Exception as e:
-    st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
-    st.stop()
 
-df = st.session_state.df_jogos
+# --- Uso no app ---
+dia = sb.calendario()  # datetime.date
+with st.spinner("⏳ Carregando dados do GitHub..."):
+    df_jogos, df_proximos_jogos, dia_br, dia_iso = carregar_dados(dia)
 
-df_proximos = st.session_state.df_proximos_jogos
+# Guarda no estado
+st.session_state.df_jogos = df_jogos
+st.session_state.df_proximos_jogos = df_proximos_jogos
+
+# --- Mensagens automáticas ---
+hoje_iso = datetime.today().strftime("%Y-%m-%d")
+ontem_iso = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+if df_proximos_jogos.empty:
+    if dia_iso > hoje_iso:
+        st.info(f"Jogos do dia {dia_br} ainda não estão disponíveis, aguarde a atualização. ⏳")
+    elif dia_iso < hoje_iso:
+        st.info(f"Não existem dados para os jogos de {dia_br}. ℹ️")
+    else:
+        st.info(f"Nenhum jogo disponível para hoje ({dia_br}).")
+else:
+    if dia_iso == hoje_iso:
+        st.toast(
+            f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
+    else:
+        st.success(f"Jogos de {dia_br} carregados com sucesso! ✅")
 
 df_jogos = pd.DataFrame()
 df_proximos_jogos = pd.DataFrame()
@@ -170,8 +204,7 @@ df_proximos = st.session_state.df_proximos_jogos
 
 if not df.empty and not df_proximos.empty:
     # --- NOVO FLUXO DE FILTROS NA SIDEBAR (BASEADO NOS PRÓXIMOS JOGOS) ---
-    st.sidebar.markdown("### 🔎 Análise de Próximos Jogos")
-
+    
     # Filtro 1: Hora
     horarios_disponiveis = sorted(df_proximos['hora'].unique())
     selected_time = st.sidebar.selectbox(
@@ -208,7 +241,7 @@ if not df.empty and not df_proximos.empty:
 
     # ✅ Filtro de Cenário
     selected_scenario = st.sidebar.selectbox(
-        "Cenário de Análise Histórica:",
+        "Cenário de Análise:",
         ["Geral", "Casa/Fora"],
         help="Geral: analisa todos os jogos de cada time. Casa/Fora: analisa apenas jogos em casa do mandante e fora do visitante."
     )
@@ -225,6 +258,11 @@ if not df.empty and not df_proximos.empty:
         df_away_base = df[df['Away'].str.lower(
         ) == away_team.lower()].copy().reset_index(drop=True)
 
+    df_home_base = df_home_base.sort_values(
+        by='Data', ascending=False).reset_index(drop=True)
+    df_away_base = df_away_base.sort_values(
+        by='Data', ascending=False).reset_index(drop=True)
+
     # --- Filtro de Intervalo de jogos ---
     with st.container():
         st.markdown("### 📅 Intervalo de Jogos")
@@ -236,7 +274,7 @@ if not df.empty and not df_proximos.empty:
             horizontal=True
         )
     num_jogos_selecionado = int(intervalo.split()[1])
-
+           
     # Ajusta o número de jogos se o usuário pedir mais do que o disponível
     num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
     num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
@@ -538,25 +576,22 @@ if not df.empty and not df_proximos.empty:
 
     # remove colunas indesejadas
     cols_to_show = [c for c in df_home.columns if c not in ["Pais", "resultado"]]
-    col1, col2 = st.columns(2)
 
-    with col1:
-        st.markdown(f"### 🏠 Últimos {num_jogos_selecionado} jogos do **{home_team}**")
-        st.dataframe(
-            df_home[cols_to_show].reset_index(drop=True),
-            use_container_width=True,
-            height=auto_height(df_home),
-            hide_index=True
-        )
+    # filtro para exibir os últimos jogos (Home)
+    st.markdown(
+        f"### 🏠 Últimos {len(df_home)} jogos do **{home_team}**")
+    st.dataframe(df_home[cols_to_show].reset_index(drop=True),
+                 use_container_width=True,
+                 height=auto_height(df_home),
+                 hide_index=True)
 
-    with col2:
-        st.markdown(f"### ✈️ Últimos {num_jogos_selecionado} jogos do **{away_team}**")
-        st.dataframe(
-            df_away[cols_to_show].reset_index(drop=True),
-            use_container_width=True,
-            height=auto_height(df_away),
-            hide_index=True
-    )
+    # filtro para exibir os últimos jogos (Away)
+    st.markdown(
+        f"### ✈️ Últimos {len(df_away)} jogos do **{away_team}**")
+    st.dataframe(df_away[cols_to_show].reset_index(drop=True),
+                 use_container_width=True,
+                 height=auto_height(df_away),
+                 hide_index=True)
 
     # --- Botão para salvar análise atual ---
 if st.sidebar.button("💾 Salvar Análise Atual"):

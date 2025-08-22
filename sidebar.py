@@ -1,4 +1,5 @@
 import streamlit as st
+import datetime
 
 # Função para a barra lateral
 def sidebar():
@@ -16,3 +17,15 @@ def sidebar():
         </div>
         <br>
     """, unsafe_allow_html=True)
+
+def calendario():
+    # Escolha do dia por defult retorna o dia atual
+    dia = st.sidebar.date_input(
+        "Selecione a data:", value=datetime.date.today(), key='date_input')
+    st.markdown("""<style>
+        div[data-testid="stDateInput"] > div:first-child {
+        width: 50px;
+    }
+</style>""", unsafe_allow_html=True)
+
+    return dia
