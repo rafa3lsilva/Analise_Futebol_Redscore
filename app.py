@@ -60,118 +60,84 @@ st.markdown("""
 # Importa a barra lateral
 sb.sidebar()
 
-st.sidebar.markdown("### 🔎 Filtros da Análise")
-URL_DADOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
-
-
+# Função para carregar a base histórica
 @st.cache_data
-def carregar_dados(data_escolhida: date):
-    """Carrega dados históricos e jogos do dia com base na data escolhida (date)."""
+def carregar_base_historica():
+    """Carrega a base de dados histórica do GitHub. Roda apenas uma vez."""
+    url = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
+    df_historicos = pd.read_csv(url)
+    return df_historicos
 
-    # Formatos
-    data_br = data_escolhida.strftime("%d/%m/%Y")   # exibição
-    data_iso = data_escolhida.strftime("%Y-%m-%d")  # nome do arquivo
+# Função para carregar os jogos do dia
+@st.cache_data
+def carregar_jogos_do_dia(data_escolhida: date):
+    """Carrega os jogos do dia com base na data escolhida. Se não encontrar dados, retorna um DataFrame vazio."""
+    # 💡 Calcula as datas ANTES do bloco try
+    data_br = data_escolhida.strftime("%d/%m/%Y")
+    data_iso = data_escolhida.strftime("%Y-%m-%d")
 
-    # Carrega base histórica
-    df_historicos = pd.read_csv(URL_DADOS)
+    # 💡 Inicializa um DataFrame vazio como padrão
+    df_futuros = pd.DataFrame()
 
-    # Monta URL dos jogos do dia
     url_jogos = f"https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/jogos_do_dia/Jogos_do_Dia_RedScore_{data_iso}.csv"
 
-    df_futuros = pd.DataFrame()
     try:
-        response = requests.get(url_jogos)
+        response = requests.get(url_jogos, timeout=10)
+        # ✅ Verifica se a requisição foi bem-sucedida (código 200)
         if response.status_code == 200:
             df_futuros = pd.read_csv(url_jogos)
+            # Continua com seu tratamento normal
             condicao_hora_valida = df_futuros['hora'].astype(
                 str).str.match(r'^\d{2}:\d{2}$')
             df_futuros = df_futuros[condicao_hora_valida].copy()
             df_futuros['confronto'] = df_futuros['home'] + \
                 ' x ' + df_futuros['away']
-    except Exception as e:
-        st.warning(f"Erro ao carregar jogos de {data_br}: {e}")
+    except requests.exceptions.RequestException as e:
+        pass 
 
-    return df_historicos, df_futuros, data_br, data_iso
+    # ✅ Garante que a função SEMPRE retorne os 3 valores esperados
+    return df_futuros, data_br, data_iso
+
+# início da sidebar
+st.sidebar.markdown("### 🔎 Filtros da Análise")
+dia_selecionado = sb.calendario()
+
+# Verificamos se a data selecionada é diferente da última data que carregamos.
+# Se for a primeira vez, 'last_loaded_date' não existirá, então carregamos também.
+if 'last_loaded_date' not in st.session_state or st.session_state.last_loaded_date != dia_selecionado:
+    with st.spinner("⏳ Carregando jogos do dia selecionado..."):
+        df_proximos_jogos, dia_br, dia_iso = carregar_jogos_do_dia(
+            dia_selecionado)
+
+    # Salvamos TUDO que precisamos no estado da sessão
+    st.session_state.df_proximos_jogos = df_proximos_jogos
+    st.session_state.dia_br = dia_br
+    st.session_state.dia_iso = dia_iso
+    st.session_state.last_loaded_date = dia_selecionado
 
 
-# --- Uso no app ---
-dia = sb.calendario()  # datetime.date
-with st.spinner("⏳ Carregando dados do GitHub..."):
-    df_jogos, df_proximos_jogos, dia_br, dia_iso = carregar_dados(dia)
-
-# Guarda no estado
-st.session_state.df_jogos = df_jogos
-st.session_state.df_proximos_jogos = df_proximos_jogos
-
-# --- Mensagens automáticas ---
-hoje_iso = datetime.today().strftime("%Y-%m-%d")
-ontem_iso = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
-
-if df_proximos_jogos.empty:
-    if dia_iso > hoje_iso:
-        st.info(f"Jogos do dia {dia_br} ainda não estão disponíveis, aguarde a atualização. ⏳")
-    elif dia_iso < hoje_iso:
-        st.info(f"Não existem dados para os jogos de {dia_br}. ℹ️")
+    # mensagens/notificações
+    hoje_iso = datetime.today().strftime("%Y-%m-%d")
+    if st.session_state.df_proximos_jogos.empty:
+        if st.session_state.dia_iso > hoje_iso:
+            st.info(
+                f"Jogos do dia {st.session_state.dia_br} ainda não estão disponíveis, aguarde a atualização ⏳")
+        elif st.session_state.dia_iso < hoje_iso:
+            st.info(
+                f"Não existem dados para os jogos de {st.session_state.dia_br}. ℹ️")
+        elif st.session_state.dia_iso < hoje_iso:
+            st.info(
+                f"Dados de jogos de {st.session_state.dia_br}, são jogos passados analise com cautela pois não refletem a situação atual. ℹ️")
+        else:
+            st.info(
+                f"Nenhum jogo disponível para hoje ({st.session_state.dia_br}).")
     else:
-        st.info(f"Nenhum jogo disponível para hoje ({dia_br}).")
-else:
-    if dia_iso == hoje_iso:
-        st.toast(
-            f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
-    else:
-        st.success(f"Jogos de {dia_br} carregados com sucesso! ✅")
-
-df_jogos = pd.DataFrame()
-df_proximos_jogos = pd.DataFrame()
-
-df_jogos = pd.read_csv(URL_DADOS)
-
-# Guarda o número de linhas antes de qualquer alteração
-num_linhas_original = len(df_jogos)
-try:
-    df_jogos = pd.read_csv(URL_DADOS)
-
-    # Guarda o número de linhas antes de qualquer alteração
-    num_linhas_original = len(df_jogos)
-
-    # Converte a coluna 'Data'
-    df_jogos['Data'] = pd.to_datetime(
-        df_jogos['Data'], format="%d-%m-%Y", errors="coerce"
-    )
-
-    # Verifica se alguma data falhou na conversão (tornou-se NaT/null)
-    jogos_com_data_invalida = df_jogos['Data'].isnull().sum()
-
-    if jogos_com_data_invalida > 0:
-        # Mostra um aviso ao utilizador na interface
-        st.warning(
-            f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
-            f"não estava no formato esperado (DD-MM-AAAA)."
-        )
-        # Remove as linhas com datas inválidas para não afetar as análises
-        df_jogos.dropna(subset=['Data'], inplace=True)
-
-    df_jogos['Data'] = df_jogos['Data'].dt.date
-    df_jogos = df_jogos.sort_values(
-        by="Data", ascending=False
-    ).reset_index(drop=True)
-
-    # ✅ Atualiza session_state
-    st.session_state.df_jogos = df_jogos
-
-    # Verifica se os dados ainda não foram carregados com sucesso nesta sessão
-    if not st.session_state.data_loaded_successfully:
-        # Mostra uma notificação temporária
-        st.toast(
-            f"Base de dados carregada com {len(df_jogos)} jogos!",
-            icon="✅"
-        )
-        # Marca que os dados foram carregados com sucesso.
-        st.session_state.data_loaded_successfully = True
-
-except Exception as e:
-    st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
-    st.stop()
+        if st.session_state.dia_iso == hoje_iso:
+            st.toast(
+                f"Jogos de hoje ({st.session_state.dia_br}) carregados! ✅", icon="✅")
+        else:
+            st.success(
+                f"Jogos de {st.session_state.dia_br} carregados com sucesso! ✅")
 
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
