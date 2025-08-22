@@ -30,6 +30,8 @@ st.set_page_config(
 )
 
 # Função auxiliar para separar a liga de forma segura
+
+
 def separar_pais_liga(nome_completo):
     if " - " in nome_completo:
         # Divide e retorna o país e a liga
@@ -39,6 +41,8 @@ def separar_pais_liga(nome_completo):
         # Se não encontrar o separador, retorna 'N/A' para o país
         # e mantém o nome original para a liga
         return pd.Series(["N/A", nome_completo])
+
+
 st.markdown(
     """
     <h1 style='display: flex; align-items: center; justify-content: center; text-align: center;'>
@@ -60,84 +64,119 @@ st.markdown("""
 # Importa a barra lateral
 sb.sidebar()
 
-# Função para carregar a base histórica
+st.sidebar.markdown("### 🔎 Filtros da Análise")
+URL_DADOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
+
+
 @st.cache_data
-def carregar_base_historica():
-    """Carrega a base de dados histórica do GitHub. Roda apenas uma vez."""
-    url = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
-    df_historicos = pd.read_csv(url)
-    return df_historicos
+def carregar_dados(data_escolhida: date):
+    """Carrega dados históricos e jogos do dia com base na data escolhida (date)."""
 
-# Função para carregar os jogos do dia
-@st.cache_data
-def carregar_jogos_do_dia(data_escolhida: date):
-    """Carrega os jogos do dia com base na data escolhida. Se não encontrar dados, retorna um DataFrame vazio."""
-    # 💡 Calcula as datas ANTES do bloco try
-    data_br = data_escolhida.strftime("%d/%m/%Y")
-    data_iso = data_escolhida.strftime("%Y-%m-%d")
+    # Formatos
+    data_br = data_escolhida.strftime("%d/%m/%Y")   # exibição
+    data_iso = data_escolhida.strftime("%Y-%m-%d")  # nome do arquivo
 
-    # 💡 Inicializa um DataFrame vazio como padrão
-    df_futuros = pd.DataFrame()
+    # Carrega base histórica
+    df_historicos = pd.read_csv(URL_DADOS)
 
+    # Monta URL dos jogos do dia
     url_jogos = f"https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/jogos_do_dia/Jogos_do_Dia_RedScore_{data_iso}.csv"
 
+    df_futuros = pd.DataFrame()
     try:
-        response = requests.get(url_jogos, timeout=10)
-        # ✅ Verifica se a requisição foi bem-sucedida (código 200)
+        response = requests.get(url_jogos)
         if response.status_code == 200:
             df_futuros = pd.read_csv(url_jogos)
-            # Continua com seu tratamento normal
             condicao_hora_valida = df_futuros['hora'].astype(
                 str).str.match(r'^\d{2}:\d{2}$')
             df_futuros = df_futuros[condicao_hora_valida].copy()
             df_futuros['confronto'] = df_futuros['home'] + \
                 ' x ' + df_futuros['away']
-    except requests.exceptions.RequestException as e:
-        pass 
+    except Exception as e:
+        st.warning(f"Erro ao carregar jogos de {data_br}: {e}")
 
-    # ✅ Garante que a função SEMPRE retorne os 3 valores esperados
-    return df_futuros, data_br, data_iso
-
-# início da sidebar
-st.sidebar.markdown("### 🔎 Filtros da Análise")
-dia_selecionado = sb.calendario()
-
-# Verificamos se a data selecionada é diferente da última data que carregamos.
-# Se for a primeira vez, 'last_loaded_date' não existirá, então carregamos também.
-if 'last_loaded_date' not in st.session_state or st.session_state.last_loaded_date != dia_selecionado:
-    with st.spinner("⏳ Carregando jogos do dia selecionado..."):
-        df_proximos_jogos, dia_br, dia_iso = carregar_jogos_do_dia(
-            dia_selecionado)
-
-    # Salvamos TUDO que precisamos no estado da sessão
-    st.session_state.df_proximos_jogos = df_proximos_jogos
-    st.session_state.dia_br = dia_br
-    st.session_state.dia_iso = dia_iso
-    st.session_state.last_loaded_date = dia_selecionado
+    return df_historicos, df_futuros, data_br, data_iso
 
 
-    # mensagens/notificações
-    hoje_iso = datetime.today().strftime("%Y-%m-%d")
-    if st.session_state.df_proximos_jogos.empty:
-        if st.session_state.dia_iso > hoje_iso:
-            st.info(
-                f"Jogos do dia {st.session_state.dia_br} ainda não estão disponíveis, aguarde a atualização ⏳")
-        elif st.session_state.dia_iso < hoje_iso:
-            st.info(
-                f"Não existem dados para os jogos de {st.session_state.dia_br}. ℹ️")
-        elif st.session_state.dia_iso < hoje_iso:
-            st.info(
-                f"Dados de jogos de {st.session_state.dia_br}, são jogos passados analise com cautela pois não refletem a situação atual. ℹ️")
-        else:
-            st.info(
-                f"Nenhum jogo disponível para hoje ({st.session_state.dia_br}).")
+# --- Uso no app ---
+dia = sb.calendario()  # datetime.date
+with st.spinner("⏳ Carregando dados do GitHub..."):
+    df_jogos, df_proximos_jogos, dia_br, dia_iso = carregar_dados(dia)
+
+# Guarda no estado
+st.session_state.df_jogos = df_jogos
+st.session_state.df_proximos_jogos = df_proximos_jogos
+
+# --- Mensagens automáticas ---
+hoje_iso = datetime.today().strftime("%Y-%m-%d")
+ontem_iso = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+if df_proximos_jogos.empty:
+    if dia_iso > hoje_iso:
+        st.info(
+            f"Jogos do dia {dia_br} ainda não estão disponíveis, aguarde a atualização. ⏳")
+    elif dia_iso < hoje_iso:
+        st.info(f"Não existem dados para os jogos de {dia_br}. ℹ️")
     else:
-        if st.session_state.dia_iso == hoje_iso:
-            st.toast(
-                f"Jogos de hoje ({st.session_state.dia_br}) carregados! ✅", icon="✅")
-        else:
-            st.success(
-                f"Jogos de {st.session_state.dia_br} carregados com sucesso! ✅")
+        st.info(f"Nenhum jogo disponível para hoje ({dia_br}).")
+else:
+    if dia_iso == hoje_iso:
+        st.toast(
+            f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
+    else:
+        st.success(f"Jogos de {dia_br} carregados com sucesso! ✅")
+
+df_jogos = pd.DataFrame()
+df_proximos_jogos = pd.DataFrame()
+
+df_jogos = pd.read_csv(URL_DADOS)
+
+# Guarda o número de linhas antes de qualquer alteração
+num_linhas_original = len(df_jogos)
+try:
+    df_jogos = pd.read_csv(URL_DADOS)
+
+    # Guarda o número de linhas antes de qualquer alteração
+    num_linhas_original = len(df_jogos)
+
+    # Converte a coluna 'Data'
+    df_jogos['Data'] = pd.to_datetime(
+        df_jogos['Data'], format="%d-%m-%Y", errors="coerce"
+    )
+
+    # Verifica se alguma data falhou na conversão (tornou-se NaT/null)
+    jogos_com_data_invalida = df_jogos['Data'].isnull().sum()
+
+    if jogos_com_data_invalida > 0:
+        # Mostra um aviso ao utilizador na interface
+        st.warning(
+            f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
+            f"não estava no formato esperado (DD-MM-AAAA)."
+        )
+        # Remove as linhas com datas inválidas para não afetar as análises
+        df_jogos.dropna(subset=['Data'], inplace=True)
+
+    df_jogos['Data'] = df_jogos['Data'].dt.date
+    df_jogos = df_jogos.sort_values(
+        by="Data", ascending=False
+    ).reset_index(drop=True)
+
+    # ✅ Atualiza session_state
+    st.session_state.df_jogos = df_jogos
+
+    # Verifica se os dados ainda não foram carregados com sucesso nesta sessão
+    if not st.session_state.data_loaded_successfully:
+        # Mostra uma notificação temporária
+        st.toast(
+            f"Base de dados carregada com {len(df_jogos)} jogos!",
+            icon="✅"
+        )
+        # Marca que os dados foram carregados com sucesso.
+        st.session_state.data_loaded_successfully = True
+
+except Exception as e:
+    st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
+    st.stop()
 
 # Exibe os dados apenas se o DataFrame não estiver vazio
 df = st.session_state.df_jogos
@@ -170,7 +209,7 @@ df_proximos = st.session_state.df_proximos_jogos
 
 if not df.empty and not df_proximos.empty:
     # --- NOVO FLUXO DE FILTROS NA SIDEBAR (BASEADO NOS PRÓXIMOS JOGOS) ---
-    
+
     # Filtro 1: Hora
     horarios_disponiveis = sorted(df_proximos['hora'].unique())
     selected_time = st.sidebar.selectbox(
@@ -240,7 +279,7 @@ if not df.empty and not df_proximos.empty:
             horizontal=True
         )
     num_jogos_selecionado = int(intervalo.split()[1])
-           
+
     # Ajusta o número de jogos se o usuário pedir mais do que o disponível
     num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
     num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
@@ -249,8 +288,7 @@ if not df.empty and not df_proximos.empty:
     df_home = df_home_base.head(num_jogos_home)
     df_away = df_away_base.head(num_jogos_away)
 
-
-    st.sidebar.markdown("<br>",unsafe_allow_html=True)
+    st.sidebar.markdown("<br>", unsafe_allow_html=True)
     with st.sidebar.expander("⚙️ Ajustar Pesos do Modelo"):
         st.markdown(
             "Ajuste a importância de cada atributo para o cálculo do vencedor.")
@@ -260,7 +298,7 @@ if not df.empty and not df_proximos.empty:
         peso_gols = st.slider("Peso dos Gols", 0.0, 3.0, 1.5)
         peso_eficiencia = st.slider("Peso da Eficiência (%)", 0.0, 5.0, 2.0)
         fator_casa = st.slider("Fator Casa (Multiplicador)",
-                            1.0, 1.5, 1.05) 
+                               1.0, 1.5, 1.05)
 
         # Crie o dicionário de pesos
         pesos_modelo = {
@@ -299,7 +337,7 @@ if not df.empty and not df_proximos.empty:
         </div>
         <br>
         """, unsafe_allow_html=True)
-    
+
     # Taxa de Vitórias home
     df_home['resultado'] = df_home['H_Gols_FT'] > df_home['A_Gols_FT']
     vitoria = df_home[df_home['resultado'] == 1].shape[0]
@@ -330,14 +368,14 @@ if not df.empty and not df_proximos.empty:
         </div>
         """,
         unsafe_allow_html=True
-)
+    )
     # Exibindo mais dados sobre os times
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"### 🏠 {home_team}")
         st.metric("Probabilidade de Vitória", f"{prob_home}%")
         st.metric("Odds Justas", f"{odd_home:.2f}")
-        st.write("Pontuação Ofensiva",f"{score_home}")
+        st.write("Pontuação Ofensiva", f"{score_home}")
         st.write("Taxa de Vitórias", f"{tx_vitoria:.2f}%")
     with col2:
         st.markdown("### ⚖️ Empate")
@@ -349,10 +387,11 @@ if not df.empty and not df_proximos.empty:
         st.metric("Odds Justas", f"{odd_away:.2f}")
         st.write("Pontuação Ofensiva", f"{score_away}")
         st.write("Taxa de Vitórias", f"{tx_vitoria_away:.2f}%")
-    
+
     st.markdown("---")
     st.subheader("🔍 Comparador de Valor (Value Bet)")
-    st.write("Insira as odds do mercado para comparar com as odds justas calculadas pelo modelo.")
+    st.write(
+        "Insira as odds do mercado para comparar com as odds justas calculadas pelo modelo.")
 
     # Criar colunas para os inputs
     col_val1, col_val2, col_val3 = st.columns(3)
@@ -409,17 +448,19 @@ if not df.empty and not df_proximos.empty:
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Média de Over 0.5 HT",
-                    f"{analise_ht_nova['media_05ht']:.1f}%")
+                      f"{analise_ht_nova['media_05ht']:.1f}%")
         with col2:
             st.metric("Média de Over 1.5 FT",
-                    f"{analise_ht_nova['media_15ft']:.1f}%")
+                      f"{analise_ht_nova['media_15ft']:.1f}%")
         with col3:
             st.metric("Média de Over 2.5 FT",
-                    f"{analise_ht_nova['media_25ft']:.1f}%")
-        st.caption("A probabilidade final é a média simples das três métricas acima.")
+                      f"{analise_ht_nova['media_25ft']:.1f}%")
+        st.caption(
+            "A probabilidade final é a média simples das três métricas acima.")
 
     # --- Painel de Apoio
-    st.markdown(f"#### Estatísticas Individuais HT de {home_team} e {away_team}")
+    st.markdown(
+        f"#### Estatísticas Individuais HT de {home_team} e {away_team}")
 
     # Chama a função antiga para obter os dados de apoio
     analise_ht_antiga = dt.analisar_gol_ht_home_away(df_home, df_away)
@@ -440,7 +481,7 @@ if not df.empty and not df_proximos.empty:
             f"Sofreu gol no HT em **{analise_ht_antiga['away_sofre']:.1f}%** dos seus jogos.")
 
     st.markdown("---")
-    
+
     df_home_final = df_home.head(num_jogos_home)
     df_away_final = df_away.head(num_jogos_away)
 
@@ -494,7 +535,7 @@ if not df.empty and not df_proximos.empty:
     )
     st.altair_chart(chart, use_container_width=True)
     st.markdown("---")
-    
+
     st.markdown("### 📊 Estimativa de Escanteios", unsafe_allow_html=True)
 
     # A chamada da função agora retorna um dicionário diferente
@@ -505,18 +546,19 @@ if not df.empty and not df_proximos.empty:
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Média Cantos Mandante",
-                f"{resultado_escanteios['Escanteios Mandante']:.2f}")
+                  f"{resultado_escanteios['Escanteios Mandante']:.2f}")
     with col2:
         st.metric("Média Cantos Visitante",
-                f"{resultado_escanteios['Escanteios Visitante']:.2f}")
+                  f"{resultado_escanteios['Escanteios Visitante']:.2f}")
     with col3:
         st.metric("Média Total Ajustada",
-                f"{resultado_escanteios['Escanteios Totais Ajustados']:.2f}")
+                  f"{resultado_escanteios['Escanteios Totais Ajustados']:.2f}")
 
     st.markdown("#### Probabilidades por Linha de Mercado")
 
     # Transforma a lista de resultados em um DataFrame
-    df_escanteios = pd.DataFrame(resultado_escanteios['Probabilidades por Mercado'])
+    df_escanteios = pd.DataFrame(
+        resultado_escanteios['Probabilidades por Mercado'])
 
     # Define quantas colunas você quer por linha
     num_colunas = 4
@@ -529,8 +571,9 @@ if not df.empty and not df_proximos.empty:
         col_index = i % num_colunas
         with cols[col_index]:
             # Exibe a métrica
-            st.metric(label=row['Mercado'], value=f"{row['Probabilidade (%)']}%", delta=f"Odd Justa: {row['Odd Justa']}")
-        
+            st.metric(
+                label=row['Mercado'], value=f"{row['Probabilidade (%)']}%", delta=f"Odd Justa: {row['Odd Justa']}")
+
         # Se chegamos na última coluna da linha atual (e não é o último item), cria uma nova linha de colunas
         if col_index == num_colunas - 1 and i < len(df_escanteios) - 1:
             cols = st.columns(num_colunas)
@@ -541,7 +584,8 @@ if not df.empty and not df_proximos.empty:
         return min(len(df) * base + header, max_height)
 
     # remove colunas indesejadas
-    cols_to_show = [c for c in df_home.columns if c not in ["Pais", "resultado"]]
+    cols_to_show = [
+        c for c in df_home.columns if c not in ["Pais", "resultado"]]
 
     # filtro para exibir os últimos jogos (Home)
     st.markdown(
@@ -572,13 +616,15 @@ if st.sidebar.button("💾 Salvar Análise Atual"):
         df_resultado_mercados['Mercado'] == 'BTTS', 'Probabilidade (%)'
     ].iloc[0]
 
-    df_escanteios = pd.DataFrame(resultado_escanteios['Probabilidades por Mercado'])
-    linha_mais_provavel = df_escanteios.loc[df_escanteios['Probabilidade (%)'].idxmax()]
+    df_escanteios = pd.DataFrame(
+        resultado_escanteios['Probabilidades por Mercado'])
+    linha_mais_provavel = df_escanteios.loc[df_escanteios['Probabilidade (%)'].idxmax(
+    )]
     linha_escanteio_str = f"{linha_mais_provavel['Mercado']} ({linha_mais_provavel['Probabilidade (%)']:.1f}%)"
 
     # 2. Monta dicionário da análise
     current_analysis = {
-        #"País": selected_country,
+        # "País": selected_country,
         "Liga": selected_league,
         "Home": home_team,
         "Away": away_team,
