@@ -124,7 +124,7 @@ else:
         st.toast(
             f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
     else:
-        st.success(f"Jogos de {dia_br} carregados com sucesso! ✅")
+        st.toast(f"Jogos de {dia_br} carregados com sucesso! ✅")
 
 df_jogos = pd.DataFrame()
 df_proximos_jogos = pd.DataFrame()
