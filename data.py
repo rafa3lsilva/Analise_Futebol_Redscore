@@ -339,3 +339,23 @@ def estimar_linha_escanteios(df_home, df_away, home_team_name, away_team_name):
         'Escanteios Totais Ajustados': round(esc_total_ajustado, 2),
         'Probabilidades por Mercado': resultados_mercado
     }
+
+
+# Alterações nas métricas de gol no HT
+
+def analisar_consistencia_gols_ht(df: pd.DataFrame) -> float:
+    """
+    Calcula o desvio padrão dos gols totais no primeiro tempo (HT)
+    de uma amostra de jogos.
+    """
+    # Garante que temos pelo menos 2 jogos para calcular o desvio padrão
+    if len(df) < 2:
+        return 0.0
+
+    # Cria uma nova coluna somando os gols de casa e fora no HT para cada jogo
+    gols_ht_por_jogo = df['H_Gols_HT'] + df['A_Gols_HT']
+
+    # Calcula e retorna o desvio padrão dessa série de gols
+    desvio_padrao_ht = gols_ht_por_jogo.std()
+
+    return desvio_padrao_ht

@@ -154,6 +154,18 @@ if not df.empty and not df_proximos.empty:
         peso_eficiencia = st.slider("Peso da Eficiência (%)", 0.0, 5.0, 2.0)
         fator_casa = st.slider("Fator Casa (Multiplicador)",
                                1.0, 1.5, 1.05)
+        
+        st.markdown("##### Limites de Consistência HT")
+        limite_consistente = st.slider(
+            "Nível 'Consistente' (DP ≤)",
+            min_value=0.1, max_value=2.0, value=0.8, step=0.1,
+            help="Qual o valor máximo do Desvio Padrão para considerar um cenário como consistente."
+        )
+        limite_imprevisivel = st.slider(
+            "Nível 'Imprevisível' (DP >)",
+            min_value=0.1, max_value=2.0, value=1.2, step=0.1,
+            help="A partir de qual valor de Desvio Padrão um cenário deve ser considerado imprevisível."
+        )
 
         # Crie o dicionário de pesos
         pesos_modelo = {
@@ -306,6 +318,33 @@ if not df.empty and not df_proximos.empty:
     st.markdown(
         f"#### Estatísticas Individuais HT de {home_team} e {away_team}")
 
+    # --- INÍCIO DA ANÁLISE DE CONSISTÊNCIA HT ---
+
+    # 1. Junta os dataframes de casa e fora para uma análise combinada
+    df_total_ht = pd.concat([df_home, df_away], ignore_index=True)
+
+    # 2. Chama a nova função que criámos em data.py
+    desvio_padrao_ht = dt.analisar_consistencia_gols_ht(df_total_ht)
+
+    # 3. Exibe a métrica e uma interpretação para o usuário
+    st.markdown("##### 🎲 Consistência do Cenário para Gols HT")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Desvio Padrão dos Gols HT", f"{desvio_padrao_ht:.2f}")
+
+    with col2:
+        if desvio_padrao_ht == 0.0:
+            interpretacao = "ℹ️ Dados insuficientes."
+        elif desvio_padrao_ht <= limite_consistente: 
+            interpretacao = "✅ **Cenário Consistente:** A quantidade de gols no HT nos jogos destas equipas tende a ser muito previsível."
+        elif desvio_padrao_ht <= limite_imprevisivel:
+            interpretacao = "⚠️ **Cenário Moderado:** Há alguma variação na quantidade de gols no HT, mas ainda com alguma previsibilidade."
+        else:
+            interpretacao = "🚨 **Cenário Imprevisível:** A quantidade de gols no HT varia muito de jogo para jogo. É um cenário de 'altos e baixos'."
+
+        st.info(interpretacao)
+        
     # Chama a função antiga para obter os dados de apoio
     analise_ht_antiga = dt.analisar_gol_ht_home_away(df_home, df_away)
 
