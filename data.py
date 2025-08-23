@@ -1,5 +1,6 @@
 import pandas as pd
 from scipy.stats import poisson
+import numpy as np
 
 
 def drop_reset_index(df):
@@ -36,81 +37,6 @@ def media_gols_sofridos(df, team_name):
     ])
 
     return gols_sofridos.mean()
-
-#estimar vencedor da partida
-
-
-def estimar_vencedor(df_home, df_away, pesos, home_team_name, away_team_name):
-    home_jogos = df_home.shape[0]
-    away_jogos = df_away.shape[0]
-
-    home_ataques = df_home["H_Ataques"].mean() if home_jogos > 0 else 0
-    away_ataques = df_away["A_Ataques"].mean() if away_jogos > 0 else 0
-
-    home_chutes = df_home["H_Chute"].mean() if home_jogos > 0 else 0
-    away_chutes = df_away["A_Chute"].mean() if away_jogos > 0 else 0
-
-    home_chutes_gol = df_home["H_Chute_Gol"].mean() if home_jogos > 0 else 0
-    away_chutes_gol = df_away["A_Chute_Gol"].mean() if away_jogos > 0 else 0
-
-    media_home_gols_marcados = media_gols_marcados(df_home, home_team_name)
-    media_away_gols_marcados = media_gols_marcados(df_away, away_team_name)
-    
-    home_eficiencia = (home_chutes_gol / home_chutes * 100) if home_chutes > 0 else 0
-    away_eficiencia = (away_chutes_gol / away_chutes * 100) if away_chutes > 0 else 0
-
-    # Pesos recebidos por parâmetro
-    score_home = (home_ataques * pesos['ataques'] +
-                  home_chutes * pesos['chutes'] +
-                  home_chutes_gol * pesos['chutes_gol'] +
-                  media_home_gols_marcados * pesos['gols'] +
-                  home_eficiencia * pesos['eficiencia'])
-    
-    score_away = (away_ataques * pesos['ataques'] +
-                  away_chutes * pesos['chutes'] +
-                  away_chutes_gol * pesos['chutes_gol'] +
-                  media_away_gols_marcados * pesos['gols'] +
-                  away_eficiencia * pesos['eficiencia'])
-    
-    # Fator casa recebido por parâmetro
-    score_home *= pesos['fator_casa']
-
-    empates_home = (df_home["H_Gols_FT"] == df_home["A_Gols_FT"]).sum()
-    empates_away = (df_away["H_Gols_FT"] == df_away["A_Gols_FT"]).sum()
-
-    total_jogos = df_home.shape[0] + df_away.shape[0]
-    total_empates = empates_home + empates_away
-
-    prob_draw = (total_empates / total_jogos * 100) if total_jogos > 0 else 0
-
-    # Probabilidade de vitória
-    restante = 100 - prob_draw
-    prob_home = (score_home / (score_home + score_away)) * \
-        restante if (score_home + score_away) > 0 else 0
-    prob_away = restante - prob_home
-   
-    total_score = score_home + score_away
-    if total_score > 0:
-        prob_home = (score_home / total_score) * (100 - prob_draw)
-        prob_away = (score_away / total_score) * (100 - prob_draw)
-    else:
-        prob_home = prob_away = (100 - prob_draw) / 2
-
-    # Odds Justas
-    min_prob = 1e-6  # evita divisão por zero ou odds absurdas
-
-    odd_home = 100 / max(prob_home, min_prob)
-    odd_away = 100 / max(prob_away, min_prob)
-    odd_draw = 100 / max(prob_draw, min_prob)
-
-    if score_home > score_away:
-        vencedor = 'home'
-    elif score_away > score_home:
-        vencedor = 'away'
-    else:
-        vencedor = 'Empate'
-
-    return vencedor, round(score_home, 2), round(score_away, 2), round(prob_home, 2), round(prob_away, 2), round(prob_draw, 2), round(odd_home, 2), round(odd_away, 2), round(odd_draw, 2)
 
 def contar_frequencia_gols_HT_home(df):
     total_jogos = df.shape[0]
@@ -357,3 +283,82 @@ def analisar_consistencia_gols_ht(df: pd.DataFrame) -> float:
     desvio_padrao_ht = gols_ht_por_jogo.std()
 
     return desvio_padrao_ht
+
+
+def calcular_forca_times(df: pd.DataFrame, min_jogos: int = 3):
+    """
+    Calcula força de ataque e defesa de cada time em relação à média da liga.
+    Se o time tiver menos que 'min_jogos', suas estatísticas são puxadas para a média.
+    """
+    media_gols_casa = df["H_Gols_FT"].mean()
+    media_gols_fora = df["A_Gols_FT"].mean()
+
+    ataque = {}
+    defesa = {}
+
+    times = pd.concat([df["Home"], df["Away"]]).unique()
+
+    for time in times:
+        jogos_casa = df[df["Home"] == time]
+        jogos_fora = df[df["Away"] == time]
+
+        n_casa = len(jogos_casa)
+        n_fora = len(jogos_fora)
+
+        # Ajuste: se poucos jogos, puxa para a média
+        ataque_casa = (jogos_casa["H_Gols_FT"].mean(
+        ) / media_gols_casa) if n_casa >= min_jogos else 1
+        defesa_casa = (jogos_casa["A_Gols_FT"].mean(
+        ) / media_gols_fora) if n_casa >= min_jogos else 1
+
+        ataque_fora = (jogos_fora["A_Gols_FT"].mean(
+        ) / media_gols_fora) if n_fora >= min_jogos else 1
+        defesa_fora = (jogos_fora["H_Gols_FT"].mean(
+        ) / media_gols_casa) if n_fora >= min_jogos else 1
+
+        ataque[time] = {"casa": ataque_casa, "fora": ataque_fora}
+        defesa[time] = {"casa": defesa_casa, "fora": defesa_fora}
+
+    return ataque, defesa, media_gols_casa, media_gols_fora
+
+
+def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 5, min_jogos: int = 3, max_gols: int = 5):
+    """
+    Calcula distribuição de placares e probabilidades com Poisson ajustada,
+    usando apenas os últimos `num_jogos` de cada time e aplicando trava de `min_jogos`.
+    """
+    # Filtra últimos N jogos do time da casa e do visitante
+    df_home = df[(df["Home"] == home) | (df["Away"] == home)].tail(num_jogos)
+    df_away = df[(df["Home"] == away) | (df["Away"] == away)].tail(num_jogos)
+
+    # Junta os jogos filtrados
+    df_filtrado = pd.concat([df_home, df_away])
+
+    ataque, defesa, media_gols_casa, media_gols_fora = calcular_forca_times(
+        df_filtrado, min_jogos=min_jogos)
+
+    # λ esperados
+    lambda_home = ataque[home]["casa"] * defesa[away]["fora"] * media_gols_casa
+    lambda_away = ataque[away]["fora"] * defesa[home]["casa"] * media_gols_fora
+
+    # Distribuições
+    probs_home = [poisson.pmf(i, lambda_home) for i in range(max_gols+1)]
+    probs_away = [poisson.pmf(i, lambda_away) for i in range(max_gols+1)]
+
+    matriz = np.outer(probs_home, probs_away)
+
+    # Probabilidades agregadas
+    p_home = np.tril(matriz, -1).sum()
+    p_away = np.triu(matriz, 1).sum()
+    p_draw = np.trace(matriz)
+
+    return {
+        "lambda_home": lambda_home,
+        "lambda_away": lambda_away,
+        "matriz": matriz,
+        "p_home": p_home,
+        "p_draw": p_draw,
+        "p_away": p_away,
+        "jogos_home_considerados": len(df_home),
+        "jogos_away_considerados": len(df_away),
+    }

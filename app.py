@@ -5,6 +5,7 @@ import data as dt
 import sidebar as sb
 import logging
 from services import carregar_dados, carregar_base_historica
+from data import prever_gols
 from views import (
     mostrar_status_carregamento,
     mostrar_tabela_jogos,
@@ -144,17 +145,6 @@ if not df.empty and not df_proximos.empty:
     # Ajustes com base em pesos
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     with st.sidebar.expander("⚙️ Ajustar Pesos do Modelo"):
-        st.markdown(
-            "Ajuste a importância de cada atributo para o cálculo do vencedor.")
-        peso_ataques = st.slider("Peso dos Ataques", 0.0, 1.0, 0.2)
-        peso_chutes = st.slider("Peso dos Chutes", 0.0, 1.0, 0.3)
-        peso_chutes_gol = st.slider("Peso dos Chutes a Gol", 0.0, 2.0, 0.5)
-        peso_gols = st.slider("Peso dos Gols", 0.0, 3.0, 1.5)
-        peso_eficiencia = st.slider("Peso da Eficiência (%)", 0.0, 5.0, 2.0)
-        fator_casa = st.slider("Fator Casa (Multiplicador)",
-                               1.0, 1.5, 1.05)
-        
-        st.markdown("##### Limites de Consistência HT")
         limite_consistente = st.slider(
             "Nível 'Consistente' (DP ≤)",
             min_value=0.1, max_value=2.0, value=0.8, step=0.1,
@@ -165,16 +155,6 @@ if not df.empty and not df_proximos.empty:
             min_value=0.1, max_value=2.0, value=1.2, step=0.1,
             help="A partir de qual valor de Desvio Padrão um cenário deve ser considerado imprevisível."
         )
-
-        # Crie o dicionário de pesos
-        pesos_modelo = {
-            'ataques': peso_ataques,
-            'chutes': peso_chutes,
-            'chutes_gol': peso_chutes_gol,
-            'gols': peso_gols,
-            'eficiencia': peso_eficiencia,
-            'fator_casa': fator_casa
-        }
 
     # Exibe as médias de gols
     media_home_gols_marcados = dt.media_gols_marcados(df_home, home_team)
@@ -203,18 +183,29 @@ if not df.empty and not df_proximos.empty:
     vitoria_away = df_away[df_away['resultado'] == 1].shape[0]
     tx_vitoria_away = (vitoria_away / num_jogos_selecionado) * 100
 
-    # Calcula os dados
-    vencedor, score_home, score_away, prob_home, prob_away, prob_draw, odd_home, odd_away, odd_draw = dt.estimar_vencedor(
-        df_home, df_away, pesos_modelo, home_team, away_team)
+    # Calcula previsões
+    resultados = prever_gols(home_team, away_team, df_jogos,    
+                         num_jogos=num_jogos_selecionado, min_jogos=3)
 
-    if vencedor == 'home':
-        vencedor = home_team
-    elif vencedor == 'away':
-        vencedor = away_team
+    # converte para %
+    prob_home = round(resultados["p_home"] * 100, 2)
+    prob_draw = round(resultados["p_draw"] * 100, 2)
+    prob_away = round(resultados["p_away"] * 100, 2)
+
+    # odds justas (sem margem de bookmaker)
+    odd_home = round(1 / max(resultados["p_home"], 1e-6), 2)
+    odd_draw = round(1 / max(resultados["p_draw"], 1e-6), 2)
+    odd_away = round(1 / max(resultados["p_away"], 1e-6), 2)
+
+    # define provável vencedor
+    if prob_home > prob_away and prob_home > prob_draw:
+        vencedor = "home"
+    elif prob_away > prob_home and prob_away > prob_draw:
+        vencedor = "away"
     else:
-        vencedor = 'Empate'
+        vencedor = "Empate"
 
-    cor = "#4CAF50" if vencedor == home_team else "#F44336" if vencedor == away_team else "#607D8B"
+    cor = "#4CAF50" if vencedor == "home" else "#F44336" if vencedor == "away" else "#607D8B"
 
     st.markdown(
         f"""
@@ -230,8 +221,8 @@ if not df.empty and not df_proximos.empty:
         st.markdown(f"### 🏠 {home_team}")
         st.metric("Probabilidade de Vitória", f"{prob_home}%")
         st.metric("Odds Justas", f"{odd_home:.2f}")
-        st.write("Pontuação Ofensiva", f"{score_home}")
         st.write("Taxa de Vitórias", f"{tx_vitoria:.2f}%")
+        st.write(f"Gols esperados: {home_team}: {resultados['lambda_home']:.2f}")
     with col2:
         st.markdown("### ⚖️ Empate")
         st.metric("Probabilidade de Empate", f"{prob_draw}%")
@@ -240,9 +231,9 @@ if not df.empty and not df_proximos.empty:
         st.markdown(f"### ✈️ {away_team}")
         st.metric("Probabilidade de Vitória", f"{prob_away}%")
         st.metric("Odds Justas", f"{odd_away:.2f}")
-        st.write("Pontuação Ofensiva", f"{score_away}")
         st.write("Taxa de Vitórias", f"{tx_vitoria_away:.2f}%")
-
+        st.write(f"Gols esperados: {away_team}: {resultados['lambda_away']:.2f}")
+        
     st.markdown("---")
     st.subheader("🔍 Comparador de Valor (Value Bet)")
     st.write(
