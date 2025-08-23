@@ -8,7 +8,7 @@ def drop_reset_index(df):
     df.index += 1
     return df
 
-def media_gols_marcados(df, team_name):
+def media_gols_marcados(df: pd.DataFrame, team_name: str) -> float:
     """Calcula a média de gols MARCADOS por um time específico,
     independentemente de ser mandante ou visitante."""
     if df.empty:
@@ -129,9 +129,10 @@ def contar_frequencia_gols_HT_away(df):
 def analisar_gol_ht_home_away(df_home, df_away):
     # 1. Calcula todas as frequências
     freq_home_marca = contar_frequencia_gols_HT_home(df_home)
-    freq_away_sofre = contar_frequencia_gols_HT_away(df_away)
     freq_home_sofre = contar_frequencia_gols_HT_away(df_home)
-    freq_away_marca = contar_frequencia_gols_HT_home(df_away)    
+
+    freq_away_marca = contar_frequencia_gols_HT_away(df_away)
+    freq_away_sofre = contar_frequencia_gols_HT_home(df_away)
 
     return {
         "home_marca": freq_home_marca * 100,

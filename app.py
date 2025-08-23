@@ -92,8 +92,10 @@ def carregar_dados(data_escolhida: date):
             df_futuros = df_futuros[condicao_hora_valida].copy()
             df_futuros['confronto'] = df_futuros['home'] + \
                 ' x ' + df_futuros['away']
-    except Exception as e:
-        st.warning(f"Erro ao carregar jogos de {data_br}: {e}")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro de conexão ao carregar jogos de {data_br}: {e}")
+    except pd.errors.ParserError as e:
+        st.error(f"Erro ao ler CSV de {data_br}: {e}")
 
     return df_historicos, df_futuros, data_br, data_iso
 
@@ -121,15 +123,15 @@ if df_proximos_jogos.empty:
         st.info(f"Nenhum jogo disponível para hoje ({dia_br}).")
 else:
     if dia_iso == hoje_iso:
-        st.toast(
-            f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
+        if "msg_carregada" not in st.session_state or st.session_state.msg_carregada != dia_iso:
+            st.toast(
+                f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
+            st.session_state.msg_carregada = dia_iso
     else:
         st.toast(f"Jogos de {dia_br} carregados com sucesso! ✅")
 
 df_jogos = pd.DataFrame()
 df_proximos_jogos = pd.DataFrame()
-
-df_jogos = pd.read_csv(URL_DADOS)
 
 # Guarda o número de linhas antes de qualquer alteração
 num_linhas_original = len(df_jogos)
