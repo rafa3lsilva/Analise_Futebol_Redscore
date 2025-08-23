@@ -1,6 +1,6 @@
 import pandas as pd
 import requests
-from datetime import date, datetime
+from datetime import date
 import streamlit as st
 from config import URL_DADOS, URL_BASE_JOGOS
 

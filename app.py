@@ -1,12 +1,9 @@
 from services import carregar_dados
 import streamlit as st
 import pandas as pd
-import altair as alt
 import data as dt
 import sidebar as sb
 import logging
-from datetime import datetime, timedelta, date
-from config import URL_DADOS
 from services import carregar_dados, carregar_base_historica
 from views import (
     mostrar_status_carregamento,
@@ -38,17 +35,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# Função auxiliar para separar a liga de forma segura
-def separar_pais_liga(nome_completo):
-    if " - " in nome_completo:
-        # Divide e retorna o país e a liga
-        partes = nome_completo.split(" - ", 1)
-        return pd.Series([partes[0], partes[1]])
-    else:
-        # Se não encontrar o separador, retorna 'N/A' para o país
-        # e mantém o nome original para a liga
-        return pd.Series(["N/A", nome_completo])
 
 # Título principal
 titulo_principal()
