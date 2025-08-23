@@ -17,7 +17,6 @@ from views import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- INICIALIZAÇÃO DO ESTADO DA SESSÃO (UMA SÓ VEZ, NO INÍCIO) ---
 if "saved_analyses" not in st.session_state:
     st.session_state.saved_analyses = []
 if "dados_jogos" not in st.session_state:
@@ -318,8 +317,6 @@ if not df.empty and not df_proximos.empty:
     st.markdown(
         f"#### Estatísticas Individuais HT de {home_team} e {away_team}")
 
-    # --- INÍCIO DA ANÁLISE DE CONSISTÊNCIA HT ---
-
     # 1. Junta os dataframes de casa e fora para uma análise combinada
     df_total_ht = pd.concat([df_home, df_away], ignore_index=True)
 
@@ -344,24 +341,24 @@ if not df.empty and not df_proximos.empty:
             interpretacao = "🚨 **Cenário Imprevisível:** A quantidade de gols no HT varia muito de jogo para jogo. É um cenário de 'altos e baixos'."
 
         st.info(interpretacao)
-        
-    # Chama a função antiga para obter os dados de apoio
-    analise_ht_antiga = dt.analisar_gol_ht_home_away(df_home, df_away)
+
+    # Análise de Gol no Primeiro Tempo (HT)
+    analise_ht = dt.analisar_gol_ht_home_away(df_home, df_away)
 
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"**Análise de {home_team}:**")
         st.info(
-            f"Marcou gol no HT em **{analise_ht_antiga['home_marca']:.1f}%** dos seus jogos.")
+            f"Marcou gol no HT em **{analise_ht['home_marca']:.1f}%** dos seus jogos.")
         st.warning(
-            f"Sofreu gol no HT em **{analise_ht_antiga['home_sofre']:.1f}%** dos seus jogos.")
+            f"Sofreu gol no HT em **{analise_ht['home_sofre']:.1f}%** dos seus jogos.")
 
     with col2:
         st.markdown(f"**Análise de {away_team}:**")
         st.info(
-            f"Marcou gol no HT em **{analise_ht_antiga['away_marca']:.1f}%** dos seus jogos.")
+            f"Marcou gol no HT em **{analise_ht['away_marca']:.1f}%** dos seus jogos.")
         st.warning(
-            f"Sofreu gol no HT em **{analise_ht_antiga['away_sofre']:.1f}%** dos seus jogos.")
+            f"Sofreu gol no HT em **{analise_ht['away_sofre']:.1f}%** dos seus jogos.")
 
     st.markdown("---")
     # Filtra os DataFrames para os últimos jogos
