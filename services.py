@@ -2,8 +2,7 @@ import pandas as pd
 import requests
 import streamlit as st
 from datetime import date
-
-URL_DADOS = "https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/dados_redscore.csv"
+from config import URL_DADOS, URL_BASE_JOGOS
 
 
 @st.cache_data
@@ -18,7 +17,7 @@ def carregar_dados(data_escolhida: date):
     df_historicos = pd.read_csv(URL_DADOS)
 
     # Monta URL dos jogos do dia
-    url_jogos = f"https://raw.githubusercontent.com/rafa3lsilva/webscrapping_redscore/refs/heads/main/jogos_do_dia/Jogos_do_Dia_RedScore_{data_iso}.csv"
+    url_jogos = f"{URL_BASE_JOGOS}/Jogos_do_Dia_RedScore_{data_iso}.csv"
 
     df_futuros = pd.DataFrame()
     try:

@@ -6,6 +6,8 @@ import data as dt
 import sidebar as sb
 import logging
 from datetime import datetime, timedelta, date
+from config import URL_DADOS
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
