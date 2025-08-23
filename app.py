@@ -7,7 +7,15 @@ import sidebar as sb
 import logging
 from datetime import datetime, timedelta, date
 from config import URL_DADOS
-
+from services import carregar_dados, carregar_base_historica
+from views import (
+    mostrar_status_carregamento,
+    mostrar_tabela_jogos,
+    titulo_principal,
+    mostrar_cards_media_gols,
+    grafico_mercados,
+    configurar_estilo_intervalo_jogos
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,8 +40,6 @@ st.set_page_config(
 )
 
 # Função auxiliar para separar a liga de forma segura
-
-
 def separar_pais_liga(nome_completo):
     if " - " in nome_completo:
         # Divide e retorna o país e a liga
@@ -44,141 +50,35 @@ def separar_pais_liga(nome_completo):
         # e mantém o nome original para a liga
         return pd.Series(["N/A", nome_completo])
 
-
-st.markdown(
-    """
-    <h1 style='display: flex; align-items: center; justify-content: center; text-align: center;'>
-        📊 Análise de Jogos de Futebol
-    </h1>
-    """,
-    unsafe_allow_html=True
-)
-
-# Descrição
-st.markdown("""
-<div  style="text-align: center; font-size: 16px;">
-    <p style='text-align: center;'>Esta é uma aplicação para análise de jogos de futebol usando dados do site Redscore.</p>
-    <p style='text-align: center;'>Você pode fazer upload de arquivos .txt com os dados dos jogos e obter análises detalhadas.</p>
-    <p style='text-align: center;'>Para mais informações, consulte o tutorial na barra lateral.</p>
-</div>
-""", unsafe_allow_html=True)
+# Título principal
+titulo_principal()
 
 # Importa a barra lateral
 sb.sidebar()
 
+# Filtros da Análise
 st.sidebar.markdown("### 🔎 Filtros da Análise")
-dia = sb.calendario()  # datetime.date
-df_jogos, df_proximos, dia_br, dia_iso = carregar_dados(dia)
+dia = sb.calendario()
 with st.spinner("⏳ Carregando dados do GitHub..."):
     df_jogos, df_proximos_jogos, dia_br, dia_iso = carregar_dados(dia)
 
-# Guarda no estado
-st.session_state.df_jogos = df_jogos
+# Base histórica e próximo jogos
 st.session_state.df_proximos_jogos = df_proximos_jogos
+df_historico = carregar_base_historica()
+st.session_state.df_jogos = df_historico
 
-# --- Mensagens automáticas ---
-hoje_iso = datetime.today().strftime("%Y-%m-%d")
-ontem_iso = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
+# Mensagens automáticas
+mostrar_status_carregamento(df_proximos_jogos, dia_br, dia_iso)
 
-if df_proximos_jogos.empty:
-    if dia_iso > hoje_iso:
-        st.info(
-            f"Jogos do dia {dia_br} ainda não estão disponíveis, aguarde a atualização. ⏳")
-    elif dia_iso < hoje_iso:
-        st.info(f"Não existem dados para os jogos de {dia_br}. ℹ️")
-    else:
-        st.info(f"Nenhum jogo disponível para hoje ({dia_br}).")
-else:
-    if dia_iso == hoje_iso:
-        if "msg_carregada" not in st.session_state or st.session_state.msg_carregada != dia_iso:
-            st.toast(
-                f"Jogos de hoje ({dia_br}) carregados com sucesso! ✅", icon="✅")
-            st.session_state.msg_carregada = dia_iso
-    else:
-        st.toast(f"Jogos de {dia_br} carregados com sucesso! ✅")
-
-df_jogos = pd.DataFrame()
-df_proximos_jogos = pd.DataFrame()
-
-# Guarda o número de linhas antes de qualquer alteração
-num_linhas_original = len(df_jogos)
-try:
-    df_jogos = pd.read_csv(URL_DADOS)
-
-    # Guarda o número de linhas antes de qualquer alteração
-    num_linhas_original = len(df_jogos)
-
-    # Converte a coluna 'Data'
-    df_jogos['Data'] = pd.to_datetime(
-        df_jogos['Data'], format="%d-%m-%Y", errors="coerce"
-    )
-
-    # Verifica se alguma data falhou na conversão (tornou-se NaT/null)
-    jogos_com_data_invalida = df_jogos['Data'].isnull().sum()
-
-    if jogos_com_data_invalida > 0:
-        # Mostra um aviso ao utilizador na interface
-        st.warning(
-            f"Atenção: {jogos_com_data_invalida} jogo(s) foram ignorados porque a data "
-            f"não estava no formato esperado (DD-MM-AAAA)."
-        )
-        # Remove as linhas com datas inválidas para não afetar as análises
-        df_jogos.dropna(subset=['Data'], inplace=True)
-
-    df_jogos['Data'] = df_jogos['Data'].dt.date
-    df_jogos = df_jogos.sort_values(
-        by="Data", ascending=False
-    ).reset_index(drop=True)
-
-    # ✅ Atualiza session_state
-    st.session_state.df_jogos = df_jogos
-
-    # Verifica se os dados ainda não foram carregados com sucesso nesta sessão
-    if not st.session_state.data_loaded_successfully:
-        # Mostra uma notificação temporária
-        st.toast(
-            f"Base de dados carregada com {len(df_jogos)} jogos!",
-            icon="✅"
-        )
-        # Marca que os dados foram carregados com sucesso.
-        st.session_state.data_loaded_successfully = True
-
-except Exception as e:
-    st.error(f"Erro ao carregar a base de dados do GitHub: {e}")
-    st.stop()
-
-# Exibe os dados apenas se o DataFrame não estiver vazio
-df = st.session_state.df_jogos
-if not df.empty:
-    st.markdown("""
-    <style>
-    div[role='radiogroup'] > label {
-        background-color: #262730;
-        color: white;
-        margin-top: 5px;
-        border-radius: 12px;
-        padding: 4px 12px;
-        margin-right: 8px;
-        cursor: pointer;
-        border: 1px solid transparent;
-        transition: all 0.2s ease-in-out;
-    }
-    div[role='radiogroup'] > label:hover {
-        background-color: #ff4b4b;
-    }
-    div[role='radiogroup'] > label[data-selected="true"] {
-        background-color: #ff4b4b;
-        border-color: white;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
+# Dados em df e df_proximos session state
 df = st.session_state.df_jogos
 df_proximos = st.session_state.df_proximos_jogos
 
-if not df.empty and not df_proximos.empty:
-    # --- NOVO FLUXO DE FILTROS NA SIDEBAR (BASEADO NOS PRÓXIMOS JOGOS) ---
+# Configura o estilo dos intervalos de jogos
+configurar_estilo_intervalo_jogos()
 
+# Filtros na sidebar
+if not df.empty and not df_proximos.empty:
     # Filtro 1: Hora
     horarios_disponiveis = sorted(df_proximos['hora'].unique())
     selected_time = st.sidebar.selectbox(
@@ -211,8 +111,6 @@ if not df.empty and not df_proximos.empty:
     home_team = selected_game_data['home'].iloc[0]
     away_team = selected_game_data['away'].iloc[0]
 
-    # --- A LÓGICA QUE VOCÊ QUERIA MANTER COMEÇA AQUI ---
-
     # ✅ Filtro de Cenário
     selected_scenario = st.sidebar.selectbox(
         "Cenário de Análise:",
@@ -232,6 +130,7 @@ if not df.empty and not df_proximos.empty:
         df_away_base = df[df['Away'].str.lower(
         ) == away_team.lower()].copy().reset_index(drop=True)
 
+    # Ordena os DataFrames pela data
     df_home_base = df_home_base.sort_values(
         by='Data', ascending=False).reset_index(drop=True)
     df_away_base = df_away_base.sort_values(
@@ -257,6 +156,7 @@ if not df.empty and not df_proximos.empty:
     df_home = df_home_base.head(num_jogos_home)
     df_away = df_away_base.head(num_jogos_away)
 
+    # Ajustes com base em pesos
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     with st.sidebar.expander("⚙️ Ajustar Pesos do Modelo"):
         st.markdown(
@@ -287,25 +187,14 @@ if not df.empty and not df_proximos.empty:
 
     # Exibe as médias de gols
     st.markdown("### 📋 Médias de Gols Home e Away", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"""
-        <div style="background-color:#1f77b4; padding:15px; border-radius:8px; text-align:center; color:white;margin-bottom: 15px;">
-            <h3>🏠 {home_team}</h3>
-            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_home_gols_marcados:.2f}</strong></p>
-            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_home_gols_sofridos:.2f}</strong></p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col2:
-        st.markdown(f"""
-        <div style="background-color:#d62728; padding:15px; border-radius:8px; text-align:center; color:white;">
-            <h3>✈️ {away_team}</h3>
-            <p style="font-size:18px;">⚽ Média de Gols Marcados: <strong>{media_away_gols_marcados:.2f}</strong></p>
-            <p style="font-size:18px;">🛡️ Média de Gols Sofridos: <strong>{media_away_gols_sofridos:.2f}</strong></p>
-        </div>
-        <br>
-        """, unsafe_allow_html=True)
+    mostrar_cards_media_gols(
+        home_team,
+        away_team,
+        media_home_gols_marcados,
+        media_home_gols_sofridos,
+        media_away_gols_marcados,
+        media_away_gols_sofridos
+    )
 
     # Taxa de Vitórias home
     df_home['resultado'] = df_home['H_Gols_FT'] > df_home['A_Gols_FT']
@@ -450,7 +339,7 @@ if not df.empty and not df_proximos.empty:
             f"Sofreu gol no HT em **{analise_ht_antiga['away_sofre']:.1f}%** dos seus jogos.")
 
     st.markdown("---")
-
+    # Filtra os DataFrames para os últimos jogos
     df_home_final = df_home.head(num_jogos_home)
     df_away_final = df_away.head(num_jogos_away)
 
@@ -494,20 +383,13 @@ if not df.empty and not df_proximos.empty:
             else:
                 st.warning("Sem valor aparente.")
 
-    # Gráfico de barras
+    # Gráfico de barras criando em views
     st.subheader("📈 Visualização Gráfica")
-    chart = alt.Chart(df_resultado_mercados).mark_bar().encode(
-        x=alt.X('Mercado', sort=None),
-        y='Probabilidade (%)',
-        color='Mercado',
-        tooltip=['Mercado', 'Probabilidade (%)', 'Odd Justa']
-    )
-    st.altair_chart(chart, use_container_width=True)
+    grafico_mercados(df_resultado_mercados)
     st.markdown("---")
 
+    # Estimativa de Escanteios
     st.markdown("### 📊 Estimativa de Escanteios", unsafe_allow_html=True)
-
-    # A chamada da função agora retorna um dicionário diferente
     resultado_escanteios = dt.estimar_linha_escanteios(
         df_home_final, df_away_final, home_team, away_team)
 
@@ -548,31 +430,11 @@ if not df.empty and not df_proximos.empty:
             cols = st.columns(num_colunas)
     st.markdown("---")
 
-    def auto_height(df, base=35, header=40, max_height=500):
-        # Calcula altura automática da tabela
-        return min(len(df) * base + header, max_height)
+    # Tabela de Jogos home e away
+    mostrar_tabela_jogos(df_home, home_team, "🏠")
+    mostrar_tabela_jogos(df_away, away_team, "✈️")
 
-    # remove colunas indesejadas
-    cols_to_show = [
-        c for c in df_home.columns if c not in ["Pais", "resultado"]]
-
-    # filtro para exibir os últimos jogos (Home)
-    st.markdown(
-        f"### 🏠 Últimos {len(df_home)} jogos do **{home_team}**")
-    st.dataframe(df_home[cols_to_show].reset_index(drop=True),
-                 use_container_width=True,
-                 height=auto_height(df_home),
-                 hide_index=True)
-
-    # filtro para exibir os últimos jogos (Away)
-    st.markdown(
-        f"### ✈️ Últimos {len(df_away)} jogos do **{away_team}**")
-    st.dataframe(df_away[cols_to_show].reset_index(drop=True),
-                 use_container_width=True,
-                 height=auto_height(df_away),
-                 hide_index=True)
-
-    # --- Botão para salvar análise atual ---
+    # Botão para salvar análise atual
 if st.sidebar.button("💾 Salvar Análise Atual"):
     # 1. Extrai os dados dos mercados e escanteios
     prob_over_1_5 = df_resultado_mercados.loc[
@@ -612,7 +474,6 @@ if st.sidebar.button("💾 Salvar Análise Atual"):
     # 3. Salva no relatório
     st.session_state.saved_analyses.append(current_analysis)
     st.toast(f"✅ Análise de '{home_team} vs {away_team}' salva no relatório!")
-
 
 # --- Relatório de análises salvas ---
 if st.session_state.saved_analyses:
