@@ -495,3 +495,97 @@ def analisar_cenario_partida(
         "over_under": over_under,
         "btts": btts,
     }
+
+
+def _stats_ht(df, time, min_jogos, liga_ht_home, liga_ht_away, scenario, num_jogos):
+    if scenario == "Casa/Fora":
+        # Apenas jogos em casa para o mandante
+        jogos_casa = df[df["Home"] == time].tail(num_jogos)
+        # Apenas jogos fora para o visitante
+        jogos_fora = df[df["Away"] == time].tail(num_jogos)
+    else:
+        # Todos os jogos, independente de casa/fora
+        jogos_casa = df[(df["Home"] == time) | (
+            df["Away"] == time)].tail(num_jogos)
+        jogos_fora = jogos_casa  # usa o mesmo conjunto
+
+    n_c, n_f = len(jogos_casa), len(jogos_fora)
+
+    # Ataque/defesa relativos no HT
+    atk_c = (jogos_casa["H_Gols_HT"].mean() /
+             liga_ht_home) if n_c >= min_jogos else 1.0
+    def_c = (jogos_casa["A_Gols_HT"].mean() /
+             liga_ht_away) if n_c >= min_jogos else 1.0
+    atk_f = (jogos_fora["A_Gols_HT"].mean() /
+             liga_ht_away) if n_f >= min_jogos else 1.0
+    def_f = (jogos_fora["H_Gols_HT"].mean() /
+             liga_ht_home) if n_f >= min_jogos else 1.0
+
+    return {"atk_c": atk_c, "def_c": def_c, "atk_f": atk_f, "def_f": def_f}
+
+
+
+def prever_gol_ht(
+    home: str,
+    away: str,
+    df: pd.DataFrame,
+    num_jogos: int = 6,
+    min_jogos: int = 3,
+    scenario: str = "Casa/Fora",
+    max_gols_ht: int = 3,
+):
+    """
+    Probabilidade de gol no 1º tempo:
+      - P(>=1 gol no HT)  (Over 0.5 HT)
+      - P(exatamente 1 gol no HT)
+    Também retorna λ_home_ht e λ_away_ht e a matriz de gols HT (0..max_gols_ht).
+    """
+
+    # Filtra conforme cenário e últimos N
+    if scenario == "Casa/Fora":
+        df_home = df[df["Home"] == home].tail(num_jogos)
+        df_away = df[df["Away"] == away].tail(num_jogos)
+    else:
+        df_home = df[(df["Home"] == home) | (
+            df["Away"] == home)].tail(num_jogos)
+        df_away = df[(df["Home"] == away) | (
+            df["Away"] == away)].tail(num_jogos)
+
+    # Médias da liga no HT
+    liga_ht_home = df["H_Gols_HT"].mean()
+    liga_ht_away = df["A_Gols_HT"].mean()
+
+    # Forças relativas no HT com shrink
+    s_home = _stats_ht(df, home, min_jogos, liga_ht_home,
+                       liga_ht_away, scenario, num_jogos)
+    s_away = _stats_ht(df, away, min_jogos, liga_ht_home,
+                    liga_ht_away, scenario, num_jogos)
+
+
+    # λ esperados no HT (mesma lógica do FT, mas com colunas de HT)
+    lam_home_ht = s_home["atk_c"] * s_away["def_f"] * liga_ht_home
+    lam_away_ht = s_away["atk_f"] * s_home["def_c"] * liga_ht_away
+
+    # Distribuição conjunta HT (assumindo independência dos processos de gol no HT)
+    probs_h = [poisson.pmf(i, lam_home_ht) for i in range(max_gols_ht + 1)]
+    probs_a = [poisson.pmf(i, lam_away_ht) for i in range(max_gols_ht + 1)]
+    matriz_ht = np.outer(probs_h, probs_a)
+
+    # Probabilidades agregadas do total no HT
+    # Total ~ Poisson(lam_total) quando soma de Poissons independentes
+    lam_total_ht = lam_home_ht + lam_away_ht
+    p_gol_ht = 1 - np.exp(-lam_total_ht)               # P(>=1)
+    p_exato1_ht = lam_total_ht * np.exp(-lam_total_ht)  # P(exatamente 1)
+
+    return {
+        "lambda_home_ht": lam_home_ht,
+        "lambda_away_ht": lam_away_ht,
+        "lambda_total_ht": lam_total_ht,
+        "p_gol_ht": round(p_gol_ht * 100, 2),           # Over 0.5 HT
+        # Exatamente 1 gol no HT
+        "p_exato1_ht": round(p_exato1_ht * 100, 2),
+        "matriz_ht": matriz_ht,
+        "jogos_home_considerados": len(df_home),
+        "jogos_away_considerados": len(df_away),
+        "cenario_usado": scenario,
+    }

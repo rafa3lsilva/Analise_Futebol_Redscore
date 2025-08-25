@@ -8,7 +8,8 @@ from services import carregar_dados, carregar_base_historica
 from data import (prever_gols,
                   calcular_btts,
                   calcular_over_under,
-                  analisar_cenario_partida
+                  analisar_cenario_partida,
+                  prever_gol_ht
 )
 from views import (
     mostrar_status_carregamento,
@@ -356,6 +357,13 @@ if not df.empty and not df_proximos.empty:
             f"Marcou gol no HT em **{analise_ht['away_marca']:.1f}%** dos seus jogos.")
         st.warning(
             f"Sofreu gol no HT em **{analise_ht['away_sofre']:.1f}%** dos seus jogos.")
+
+    st.markdown("---")
+    ht = prever_gol_ht(home_team, away_team, df_jogos,
+                       num_jogos=num_jogos_selecionado, scenario=selected_scenario)
+    st.markdown(f"### 🕐 Gol no 1º Tempo")
+    st.markdown(f"- Over 0.5 HT: **{ht['p_gol_ht']}%**")
+    st.markdown(f"- Exatamente 1 gol no HT: **{ht['p_exato1_ht']}%**")
 
     st.markdown("---")
     # Filtra os DataFrames para os últimos jogos
