@@ -471,9 +471,9 @@ def analisar_cenario_partida(
     # --- 3. BTTS
     btts = calcular_btts(resultados)
 
-    # --- 4. Top 3 Placar(es) mais prováveis
+    # --- 4. Top 5 Placar(es) mais prováveis
     flat_probs = matriz.flatten()
-    top_indices = flat_probs.argsort()[-3:][::-1]  # 3 maiores probabilidades
+    top_indices = flat_probs.argsort()[-5:][::-1]  # 5 maiores probabilidades
 
     placares_provaveis = []
     for idx in top_indices:
