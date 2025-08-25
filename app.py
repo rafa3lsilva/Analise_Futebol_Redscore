@@ -5,14 +5,16 @@ import data as dt
 import sidebar as sb
 import logging
 from services import carregar_dados, carregar_base_historica
-from data import prever_gols
+from data import (prever_gols,
+                  calcular_over_under,
+)
 from views import (
     mostrar_status_carregamento,
     mostrar_tabela_jogos,
     titulo_principal,
     mostrar_cards_media_gols,
     grafico_mercados,
-    configurar_estilo_intervalo_jogos
+    configurar_estilo_intervalo_jogos,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -199,13 +201,13 @@ if not df.empty and not df_proximos.empty:
 
     # define provável vencedor
     if prob_home > prob_away and prob_home > prob_draw:
-        vencedor = "home"
+        vencedor = home_team
     elif prob_away > prob_home and prob_away > prob_draw:
-        vencedor = "away"
+        vencedor = away_team
     else:
         vencedor = "Empate"
 
-    cor = "#4CAF50" if vencedor == "home" else "#F44336" if vencedor == "away" else "#607D8B"
+    cor = "#4CAF50" if vencedor == home_team else "#F44336" if vencedor == away_team else "#607D8B"
 
     st.markdown(
         f"""
@@ -395,6 +397,21 @@ if not df.empty and not df_proximos.empty:
                 st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
             else:
                 st.warning("Sem valor aparente.")
+                
+    st.markdown("---")
+    linha_gols = st.sidebar.selectbox(
+        "Linha de Gols (Over/Under)",
+        [1.5, 2.0, 2.5, 3.0, 3.5],
+        index=2
+    )
+    over_under = calcular_over_under(resultados, linha=linha_gols)
+
+    st.markdown(f"""
+    ### 📊 Probabilidades Over/Under {linha_gols} gols
+    - 🔼 Over {linha_gols}: **{over_under['p_over']}%**
+    - 🔽 Under {linha_gols}: **{over_under['p_under']}%**
+    """)
+    st.markdown("---")
 
     # Gráfico de barras criando em views
     st.subheader("📈 Visualização Gráfica")

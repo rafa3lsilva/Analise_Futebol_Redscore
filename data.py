@@ -362,3 +362,32 @@ def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 5, min_
         "jogos_home_considerados": len(df_home),
         "jogos_away_considerados": len(df_away),
     }
+
+
+def calcular_over_under(resultados: dict, linha: float = 2.5):
+    """
+    Calcula probabilidades de Over/Under X gols
+    com base na matriz de placares prevista pelo modelo Poisson.
+    
+    resultados: dict retornado por prever_gols
+    linha: float, ex.: 2.5 ou 3.5
+    """
+    matriz = resultados["matriz"]
+    max_gols = matriz.shape[0] - 1
+
+    p_over = 0
+    p_under = 0
+
+    for i in range(max_gols+1):   # gols home
+        for j in range(max_gols+1):  # gols away
+            total_gols = i + j
+            if total_gols > linha:
+                p_over += matriz[i, j]
+            else:
+                p_under += matriz[i, j]
+
+    return {
+        "linha": linha,
+        "p_over": round(p_over * 100, 2),
+        "p_under": round(p_under * 100, 2),
+    }
