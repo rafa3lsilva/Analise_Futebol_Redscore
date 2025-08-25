@@ -428,3 +428,70 @@ def calcular_btts(resultados: dict):
         "p_btts_sim": round(p_btts_sim * 100, 2),
         "p_btts_nao": round(p_btts_nao * 100, 2),
     }
+
+
+def analisar_cenario_partida(
+    home: str,
+    away: str,
+    df: pd.DataFrame,
+    num_jogos: int = 6,
+    min_jogos: int = 3,
+    max_gols: int = 5,
+    scenario: str = "Casa/Fora",
+    linha_gols: float = 2.5
+):
+    """
+    Consolida a análise do cenário da partida:
+    - Probabilidades 1X2
+    - Over/Under
+    - BTTS
+    - Placar mais provável
+    - Cenário usado
+    """
+
+    # --- Calcula a matriz de gols esperados
+    resultados = prever_gols(
+        home, away, df,
+        num_jogos=num_jogos,
+        min_jogos=min_jogos,
+        max_gols=max_gols,
+        scenario=scenario
+    )
+
+    matriz = resultados["matriz"]
+
+    # --- 1. Probabilidades 1X2
+    p_home = resultados["p_home"] * 100
+    p_draw = resultados["p_draw"] * 100
+    p_away = resultados["p_away"] * 100
+
+    # --- 2. Over/Under
+    over_under = calcular_over_under(resultados, linha=linha_gols)
+
+    # --- 3. BTTS
+    btts = calcular_btts(resultados)
+
+    # --- 4. Top 3 Placar(es) mais prováveis
+    flat_probs = matriz.flatten()
+    top_indices = flat_probs.argsort()[-3:][::-1]  # 3 maiores probabilidades
+
+    placares_provaveis = []
+    for idx in top_indices:
+        i, j = divmod(idx, matriz.shape[1])
+        placares_provaveis.append({
+            "placar": f"{i} x {j}",
+            "prob": round(flat_probs[idx] * 100, 2)
+        })
+
+    # --- Retorno consolidado
+    return {
+        "cenario_usado": scenario,
+        "lambda_home": resultados["lambda_home"],
+        "lambda_away": resultados["lambda_away"],
+        "prob_home": round(p_home, 2),
+        "prob_draw": round(p_draw, 2),
+        "prob_away": round(p_away, 2),
+        "placares_top": placares_provaveis,
+        "over_under": over_under,
+        "btts": btts,
+    }

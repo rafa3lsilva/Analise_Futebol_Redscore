@@ -8,6 +8,7 @@ from services import carregar_dados, carregar_base_historica
 from data import (prever_gols,
                   calcular_btts,
                   calcular_over_under,
+                  analisar_cenario_partida
 )
 from views import (
     mostrar_status_carregamento,
@@ -425,6 +426,40 @@ if not df.empty and not df_proximos.empty:
     """)
 
     st.markdown("---")
+    analise = analisar_cenario_partida(
+        home_team,
+        away_team,
+        df_jogos,
+        num_jogos=num_jogos_selecionado,
+        scenario=selected_scenario,
+        linha_gols=2.5
+    )
+
+    st.markdown(f"""
+    ## 📊 Cenário da Partida ({analise['cenario_usado']})
+    - 🏠 Vitória {home_team}: **{analise['prob_home']}%**
+    - 🤝 Empate: **{analise['prob_draw']}%**
+    - ✈️ Vitória {away_team}: **{analise['prob_away']}%**
+
+    ### 📈 Over/Under {analise['over_under']['linha']} gols
+    - 🔼 Over: **{analise['over_under']['p_over']}%**
+    - 🔽 Under: **{analise['over_under']['p_under']}%**
+
+    ### 🤝 BTTS (Ambos marcam)
+    - ✅ Sim: **{analise['btts']['p_btts_sim']}%**
+    - ❌ Não: **{analise['btts']['p_btts_nao']}%**
+    """)
+
+    st.markdown("### 🔮 Top 3 Placares Mais Prováveis")
+    cols = st.columns(3)
+    for idx, p in enumerate(analise['placares_top']):
+        with cols[idx]:
+            st.markdown(f"""
+            <div style="background-color:#1f2937; padding:15px; border-radius:8px; text-align:center; color:white;">
+                <h3 style="margin:0;">{p['placar']}</h3>
+                <p style="font-size:18px; margin:0;">{p['prob']}%</p>
+            </div>
+            """, unsafe_allow_html=True)
 
     # Gráfico de barras criando em views
     st.subheader("📈 Visualização Gráfica")
