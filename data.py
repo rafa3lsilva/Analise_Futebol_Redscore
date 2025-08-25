@@ -402,3 +402,29 @@ def calcular_over_under(resultados: dict, linha: float = 2.5):
         "p_over": round(p_over * 100, 2),
         "p_under": round(p_under * 100, 2),
     }
+
+
+def calcular_btts(resultados: dict):
+    """
+    Calcula probabilidades de Both Teams to Score (BTTS) 
+    com base na matriz de placares prevista pelo modelo Poisson.
+    
+    resultados: dict retornado por prever_gols
+    """
+    matriz = resultados["matriz"]
+    max_gols = matriz.shape[0] - 1
+
+    p_btts_sim = 0
+    p_btts_nao = 0
+
+    for i in range(max_gols+1):   # gols home
+        for j in range(max_gols+1):  # gols away
+            if i > 0 and j > 0:
+                p_btts_sim += matriz[i, j]
+            else:
+                p_btts_nao += matriz[i, j]
+
+    return {
+        "p_btts_sim": round(p_btts_sim * 100, 2),
+        "p_btts_nao": round(p_btts_nao * 100, 2),
+    }

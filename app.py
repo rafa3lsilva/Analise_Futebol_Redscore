@@ -6,6 +6,7 @@ import sidebar as sb
 import logging
 from services import carregar_dados, carregar_base_historica
 from data import (prever_gols,
+                  calcular_btts,
                   calcular_over_under,
 )
 from views import (
@@ -413,6 +414,16 @@ if not df.empty and not df_proximos.empty:
     - 🔼 Over {linha_gols}: **{over_under['p_over']}%**
     - 🔽 Under {linha_gols}: **{over_under['p_under']}%**
     """)
+
+    # Depois de rodar prever_gols(...)
+    btts = calcular_btts(resultados)
+
+    st.markdown(f"""
+    ### 🤝 Both Teams to Score (BTTS)
+    - ✅ Sim: **{btts['p_btts_sim']}%**
+    - ❌ Não: **{btts['p_btts_nao']}%**
+    """)
+
     st.markdown("---")
 
     # Gráfico de barras criando em views
