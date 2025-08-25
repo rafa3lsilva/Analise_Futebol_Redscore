@@ -4,24 +4,8 @@ import pandas as pd
 import data as dt
 import sidebar as sb
 import logging
-from services import carregar_dados, carregar_base_historica
-from data import (prever_gols,
-                  calcular_btts,
-                  calcular_over_under,
-                  analisar_cenario_partida,
-                  prever_gol_ht,
-                  prever_escanteios_nb,
-                  calcular_over_under_cantos,
-                  prob_home_mais_cantos,
-)
-from views import (
-    mostrar_status_carregamento,
-    mostrar_tabela_jogos,
-    titulo_principal,
-    mostrar_cards_media_gols,
-    grafico_mercados,
-    configurar_estilo_intervalo_jogos,
-)
+import services as sv
+import views as vw
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,7 +29,7 @@ st.set_page_config(
 )
 
 # Título principal
-titulo_principal()
+vw.titulo_principal()
 
 # Importa a barra lateral
 sb.sidebar()
@@ -58,18 +42,18 @@ with st.spinner("⏳ Carregando dados do GitHub..."):
 
 # Base histórica e próximo jogos
 st.session_state.df_proximos_jogos = df_proximos_jogos
-df_historico = carregar_base_historica()
+df_historico = sv.carregar_base_historica()
 st.session_state.df_jogos = df_historico
 
 # Mensagens automáticas
-mostrar_status_carregamento(df_proximos_jogos, dia_br, dia_iso)
+vw.mostrar_status_carregamento(df_proximos_jogos, dia_br, dia_iso)
 
 # Dados em df e df_proximos session state
 df = st.session_state.df_jogos
 df_proximos = st.session_state.df_proximos_jogos
 
 # Configura o estilo dos intervalos de jogos
-configurar_estilo_intervalo_jogos()
+vw.configurar_estilo_intervalo_jogos()
 
 # Filtros na sidebar
 if not df.empty and not df_proximos.empty:
@@ -172,7 +156,7 @@ if not df.empty and not df_proximos.empty:
 
     # Exibe as médias de gols
     st.markdown("### 📋 Médias de Gols Home e Away", unsafe_allow_html=True)
-    mostrar_cards_media_gols(
+    vw.mostrar_cards_media_gols(
         home_team,
         away_team,
         media_home_gols_marcados,
@@ -192,7 +176,7 @@ if not df.empty and not df_proximos.empty:
     tx_vitoria_away = (vitoria_away / num_jogos_selecionado) * 100
 
     # Calcula previsões
-    resultados = prever_gols(home_team, away_team, df_jogos,
+    resultados = dt.prever_gols(home_team, away_team, df_jogos,
                              num_jogos=num_jogos_selecionado,
                              min_jogos=3,
                              scenario=selected_scenario)
@@ -284,91 +268,71 @@ if not df.empty and not df_proximos.empty:
             st.warning("Sem valor aparente.")
 
     # Analise de gol HT
-    st.markdown("---")
-    st.markdown("#### Análise de Gol no Primeiro Tempo (HT)",
-                unsafe_allow_html=True)
-    analise_ht_nova = dt.analise_gol_ht(df_home, df_away)
+    st.markdown("## 🕐 Gol no 1º Tempo")
+    # 🎯 Modelo probabilístico (Poisson)
+    ht = dt.prever_gol_ht(
+        home_team, away_team, df_jogos,
+        num_jogos=num_jogos_selecionado,
+        scenario=selected_scenario
+    )
+    st.markdown(f"### Probabilidades com base no Modelo Poisson")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"- Over 0.5 HT: **{ht['p_gol_ht']}%**")
+    with col2:
+        st.markdown(f"- Exatamente 1 gol no HT: **{ht['p_exato1_ht']}%**")
 
-    # 2. Exibe o resultado principal da nova análise
-    st.markdown(f"##### {analise_ht_nova['conclusao']}")
-
-    # Exibe a probabilidade e a odd justa, se aplicável
-    if analise_ht_nova['odd_justa'] > 0:
-        st.success(
-            f"Probabilidade Estimada (baseada nas médias): **{analise_ht_nova['probabilidade']:.1f}%**. "
-            f"Odd Justa Mínima: **{analise_ht_nova['odd_justa']:.2f}**"
-        )
-
-    # Adiciona um expansor para mostrar os detalhes do cálculo
-    with st.expander("Ver detalhes do cálculo"):
+    # Histórico de apoio
+    analise_ht_hist = dt.analise_gol_ht(df_home, df_away)
+    with st.expander("📋 Estatística de apoio para gols no 1º tempo"):
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Média de Over 0.5 HT",
-                      f"{analise_ht_nova['media_05ht']:.1f}%")
+            st.metric("Média Over 0.5 HT", f"{analise_ht_hist['media_05ht']:.1f}%")
         with col2:
-            st.metric("Média de Over 1.5 FT",
-                      f"{analise_ht_nova['media_15ft']:.1f}%")
+            st.metric("Média Over 1.5 FT", f"{analise_ht_hist['media_15ft']:.1f}%")
         with col3:
-            st.metric("Média de Over 2.5 FT",
-                      f"{analise_ht_nova['media_25ft']:.1f}%")
-        st.caption(
-            "A probabilidade final é a média simples das três métricas acima.")
+            st.metric("Média Over 2.5 FT", f"{analise_ht_hist['media_25ft']:.1f}%")
 
-    # --- Painel de Apoio
-    st.markdown(
-        f"#### Estatísticas Individuais HT de {home_team} e {away_team}")
+        # 1. Junta os dataframes de casa e fora para uma análise combinada
+        df_total_ht = pd.concat([df_home, df_away], ignore_index=True)
 
-    # 1. Junta os dataframes de casa e fora para uma análise combinada
-    df_total_ht = pd.concat([df_home, df_away], ignore_index=True)
+        # 2. Chama a nova função que criámos em data.py
+        desvio_padrao_ht = dt.analisar_consistencia_gols_ht(df_total_ht)
 
-    # 2. Chama a nova função que criámos em data.py
-    desvio_padrao_ht = dt.analisar_consistencia_gols_ht(df_total_ht)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Desvio Padrão dos Gols HT", f"{desvio_padrao_ht:.2f}")
 
-    # 3. Exibe a métrica e uma interpretação para o usuário
-    st.markdown("##### 🎲 Consistência do Cenário para Gols HT")
+        with col2:
+            if desvio_padrao_ht == 0.0:
+                interpretacao = "ℹ️ Dados insuficientes."
+            elif desvio_padrao_ht <= limite_consistente: 
+                interpretacao = "✅ **Cenário Consistente:** A quantidade de gols no HT nos jogos destas equipas tende a ser muito previsível."
+            elif desvio_padrao_ht <= limite_imprevisivel:
+                interpretacao = "⚠️ **Cenário Moderado:** Há alguma variação na quantidade de gols no HT, mas ainda com alguma previsibilidade."
+            else:
+                interpretacao = "🚨 **Cenário Imprevisível:** A quantidade de gols no HT varia muito de jogo para jogo. É um cenário de 'altos e baixos'."
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Desvio Padrão dos Gols HT", f"{desvio_padrao_ht:.2f}")
+            st.info(interpretacao)
 
-    with col2:
-        if desvio_padrao_ht == 0.0:
-            interpretacao = "ℹ️ Dados insuficientes."
-        elif desvio_padrao_ht <= limite_consistente: 
-            interpretacao = "✅ **Cenário Consistente:** A quantidade de gols no HT nos jogos destas equipas tende a ser muito previsível."
-        elif desvio_padrao_ht <= limite_imprevisivel:
-            interpretacao = "⚠️ **Cenário Moderado:** Há alguma variação na quantidade de gols no HT, mas ainda com alguma previsibilidade."
-        else:
-            interpretacao = "🚨 **Cenário Imprevisível:** A quantidade de gols no HT varia muito de jogo para jogo. É um cenário de 'altos e baixos'."
+        # Análise de Gol no Primeiro Tempo (HT)
+        analise_ht = dt.analisar_gol_ht_home_away(df_home, df_away)
 
-        st.info(interpretacao)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Análise de {home_team}:**")
+            st.info(
+                f"Marcou gol no HT em **{analise_ht['home_marca']:.1f}%** dos seus jogos.")
+            st.warning(
+                f"Sofreu gol no HT em **{analise_ht['home_sofre']:.1f}%** dos seus jogos.")
 
-    # Análise de Gol no Primeiro Tempo (HT)
-    analise_ht = dt.analisar_gol_ht_home_away(df_home, df_away)
+        with col2:
+            st.markdown(f"**Análise de {away_team}:**")
+            st.info(
+                f"Marcou gol no HT em **{analise_ht['away_marca']:.1f}%** dos seus jogos.")
+            st.warning(
+                f"Sofreu gol no HT em **{analise_ht['away_sofre']:.1f}%** dos seus jogos.")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(f"**Análise de {home_team}:**")
-        st.info(
-            f"Marcou gol no HT em **{analise_ht['home_marca']:.1f}%** dos seus jogos.")
-        st.warning(
-            f"Sofreu gol no HT em **{analise_ht['home_sofre']:.1f}%** dos seus jogos.")
-
-    with col2:
-        st.markdown(f"**Análise de {away_team}:**")
-        st.info(
-            f"Marcou gol no HT em **{analise_ht['away_marca']:.1f}%** dos seus jogos.")
-        st.warning(
-            f"Sofreu gol no HT em **{analise_ht['away_sofre']:.1f}%** dos seus jogos.")
-
-    st.markdown("---")
-    ht = prever_gol_ht(home_team, away_team, df_jogos,
-                       num_jogos=num_jogos_selecionado, scenario=selected_scenario)
-    st.markdown(f"### 🕐 Gol no 1º Tempo")
-    st.markdown(f"- Over 0.5 HT: **{ht['p_gol_ht']}%**")
-    st.markdown(f"- Exatamente 1 gol no HT: **{ht['p_exato1_ht']}%**")
-
-    st.markdown("---")
     # Filtra os DataFrames para os últimos jogos
     df_home_final = df_home.head(num_jogos_home)
     df_away_final = df_away.head(num_jogos_away)
@@ -419,7 +383,7 @@ if not df.empty and not df_proximos.empty:
         [1.5, 2.0, 2.5, 3.0, 3.5],
         index=2
     )
-    over_under = calcular_over_under(resultados, linha=linha_gols)
+    over_under = dt.calcular_over_under(resultados, linha=linha_gols)
 
     st.markdown(f"""
     ### 📊 Probabilidades Over/Under {linha_gols} gols
@@ -428,7 +392,7 @@ if not df.empty and not df_proximos.empty:
     """)
 
     # Depois de rodar prever_gols(...)
-    btts = calcular_btts(resultados)
+    btts = dt.calcular_btts(resultados)
 
     st.markdown(f"""
     ### 🤝 Both Teams to Score (BTTS)
@@ -437,7 +401,7 @@ if not df.empty and not df_proximos.empty:
     """)
 
     st.markdown("---")
-    analise = analisar_cenario_partida(
+    analise = dt.analisar_cenario_partida(
         home_team,
         away_team,
         df_jogos,
@@ -474,7 +438,7 @@ if not df.empty and not df_proximos.empty:
 
     # Gráfico de barras criando em views
     st.subheader("📈 Visualização Gráfica")
-    grafico_mercados(df_resultado_mercados)
+    vw.grafico_mercados(df_resultado_mercados)
     st.markdown("---")
 
     # Estimativa de Escanteios
@@ -527,15 +491,15 @@ if not df.empty and not df_proximos.empty:
     st.session_state.linha_escanteios = linha_escanteios
 
     # Calcula probabilidades de escanteios
-    cantos = prever_escanteios_nb(home_team, away_team, df_jogos,
+    cantos = dt.prever_escanteios_nb(home_team, away_team, df_jogos,
                                 num_jogos=num_jogos_selecionado, scenario=selected_scenario)
 
     # Probabilidades Over/Under
-    st.session_state.over_under_cantos = calcular_over_under_cantos(
+    st.session_state.over_under_cantos = dt.calcular_over_under_cantos(
         cantos, st.session_state.linha_escanteios)
 
     # Quem tem mais cantos
-    mais_cantos = prob_home_mais_cantos(cantos)
+    mais_cantos = dt.prob_home_mais_cantos(cantos)
 
     # Exibição
     st.markdown("### 🟦 Escanteios")
@@ -551,8 +515,8 @@ if not df.empty and not df_proximos.empty:
 
 
     # Tabela de Jogos home e away
-    mostrar_tabela_jogos(df_home, home_team, "🏠")
-    mostrar_tabela_jogos(df_away, away_team, "✈️")
+    vw.mostrar_tabela_jogos(df_home, home_team, "🏠")
+    vw.mostrar_tabela_jogos(df_away, away_team, "✈️")
 
     # Botão para salvar análise atual
 if st.sidebar.button("💾 Salvar Análise Atual"):
@@ -584,7 +548,7 @@ if st.sidebar.button("💾 Salvar Análise Atual"):
         "Prob. Casa (%)": prob_home,
         "Prob. Empate (%)": prob_draw,
         "Prob. Visitante (%)": prob_away,
-        "Prob. Gol HT (%)": round(analise_ht_nova['probabilidade'], 2),
+        "Prob. Gol HT (%)": round(ht['p_gol_ht'], 2),
         "Prob. Over 1.5 (%)": prob_over_1_5,
         "Prob. Over 2.5 (%)": prob_over_2_5,
         "Prob. BTTS (%)": prob_btts,
