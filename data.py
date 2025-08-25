@@ -322,18 +322,29 @@ def calcular_forca_times(df: pd.DataFrame, min_jogos: int = 3):
     return ataque, defesa, media_gols_casa, media_gols_fora
 
 
-def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 5, min_jogos: int = 3, max_gols: int = 5):
+def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 6,
+                min_jogos: int = 3, max_gols: int = 5, scenario: str = "Casa/Fora"):
     """
-    Calcula distribuição de placares e probabilidades com Poisson ajustada,
-    usando apenas os últimos `num_jogos` de cada time e aplicando trava de `min_jogos`.
+    Previsão de gols com Poisson ajustada.
+    scenario: "Geral" ou "Casa/Fora"
     """
-    # Filtra últimos N jogos do time da casa e do visitante
-    df_home = df[(df["Home"] == home) | (df["Away"] == home)].tail(num_jogos)
-    df_away = df[(df["Home"] == away) | (df["Away"] == away)].tail(num_jogos)
+
+    if scenario == "Casa/Fora":
+        # Últimos N jogos em casa do mandante
+        df_home = df[df["Home"] == home].tail(num_jogos)
+        # Últimos N jogos fora do visitante
+        df_away = df[df["Away"] == away].tail(num_jogos)
+    else:  # Geral
+        # Últimos N jogos do time, independentemente do mando
+        df_home = df[(df["Home"] == home) | (
+            df["Away"] == home)].tail(num_jogos)
+        df_away = df[(df["Home"] == away) | (
+            df["Away"] == away)].tail(num_jogos)
 
     # Junta os jogos filtrados
     df_filtrado = pd.concat([df_home, df_away])
 
+    # Forças ajustadas
     ataque, defesa, media_gols_casa, media_gols_fora = calcular_forca_times(
         df_filtrado, min_jogos=min_jogos)
 

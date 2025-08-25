@@ -186,8 +186,10 @@ if not df.empty and not df_proximos.empty:
     tx_vitoria_away = (vitoria_away / num_jogos_selecionado) * 100
 
     # Calcula previsões
-    resultados = prever_gols(home_team, away_team, df_jogos,    
-                         num_jogos=num_jogos_selecionado, min_jogos=3)
+    resultados = prever_gols(home_team, away_team, df_jogos,
+                             num_jogos=num_jogos_selecionado,
+                             min_jogos=3,
+                             scenario=selected_scenario)
 
     # converte para %
     prob_home = round(resultados["p_home"] * 100, 2)
@@ -397,7 +399,7 @@ if not df.empty and not df_proximos.empty:
                 st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
             else:
                 st.warning("Sem valor aparente.")
-                
+
     st.markdown("---")
     linha_gols = st.sidebar.selectbox(
         "Linha de Gols (Over/Under)",
