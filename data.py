@@ -348,6 +348,9 @@ def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 6,
     ataque, defesa, media_gols_casa, media_gols_fora = calcular_forca_times(
         df_filtrado, min_jogos=min_jogos)
 
+    lambda_home = ataque[home]["casa"] * defesa[away]["fora"] * media_gols_casa
+    lambda_away = ataque[away]["fora"] * defesa[home]["casa"] * media_gols_fora
+    
     # λ esperados
     lambda_home = ataque[home]["casa"] * defesa[away]["fora"] * media_gols_casa
     lambda_away = ataque[away]["fora"] * defesa[home]["casa"] * media_gols_fora
@@ -448,7 +451,15 @@ def analisar_cenario_partida(
     - Placar mais provável
     - Cenário usado
     """
+    # verifica se há dados históricos
+    times_historicos = pd.unique(df[['Home', 'Away']].values.ravel('K'))
 
+    if home not in times_historicos:
+        return {"erro": f"Não há dados históricos suficientes para a equipa: {home}"}
+
+    if away not in times_historicos:
+        return {"erro": f"Não há dados históricos suficientes para a equipa: {away}"}
+   
     # --- Calcula a matriz de gols esperados
     resultados = prever_gols(
         home, away, df,
