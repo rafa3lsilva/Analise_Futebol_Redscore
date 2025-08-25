@@ -121,50 +121,6 @@ def analise_gol_ht(df_home, df_away, suavizar=True):
         "media_25ft": prob_25ft * 100,
     }
 
-def analisar_mercados(df_home, df_away, suavizar=True):
-    df_total = pd.concat([df_home, df_away], ignore_index=True)
-    total_jogos = df_total.shape[0]
-
-    # Funções auxiliares
-    def contar_prob(sucessos, total):
-        return (sucessos + 1) / (total + 2) if suavizar else sucessos / total if total > 0 else 0.0
-
-    def odd_justa(prob):
-        return round(1 / prob, 2) if prob > 0 else 0.0
-
-    # Contagem de eventos
-    over_1_5 = df_total[(df_total["H_Gols_FT"] +
-                         df_total["A_Gols_FT"]) > 1].shape[0]
-    over_2_5 = df_total[(df_total["H_Gols_FT"] +
-                         df_total["A_Gols_FT"]) > 2].shape[0]
-    btts = df_total[(df_total["H_Gols_FT"] > 0) & (
-        df_total["A_Gols_FT"] > 0)].shape[0]
-
-    # Cálculo
-    mercados = {
-        "Over 1.5": over_1_5,
-        "Over 2.5": over_2_5,
-        "BTTS": btts
-    }
-
-    painel = []
-    for nome, sucessos in mercados.items():
-        prob = contar_prob(sucessos, total_jogos)
-        odd = odd_justa(prob)
-        painel.append({
-            "Mercado": nome,
-            "Jogos com evento": sucessos,
-            "Total analisado": total_jogos,
-            "Probabilidade (%)": round(prob * 100, 1),
-            "Odd Justa": odd
-        })
-
-    return drop_reset_index(pd.DataFrame(painel))
-
-# Função para calcular média segura
-def safe_mean(df, col):
-    return df[col].mean() if col in df.columns else 0.0
-
 # Função para calcular estatísticas dos times
 def calc_stats_team(df, team_name):
     """Calcula as estatísticas para um time específico dentro de um DataFrame."""
