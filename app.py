@@ -9,7 +9,10 @@ from data import (prever_gols,
                   calcular_btts,
                   calcular_over_under,
                   analisar_cenario_partida,
-                  prever_gol_ht
+                  prever_gol_ht,
+                  prever_escanteios_nb,
+                  calcular_over_under_cantos,
+                  prob_home_mais_cantos,
 )
 from views import (
     mostrar_status_carregamento,
@@ -514,7 +517,38 @@ if not df.empty and not df_proximos.empty:
         # Se chegamos na última coluna da linha atual (e não é o último item), cria uma nova linha de colunas
         if col_index == num_colunas - 1 and i < len(df_escanteios) - 1:
             cols = st.columns(num_colunas)
+    # --- Linha Over/Under de Escanteios ---
+    st.sidebar.markdown("### 📊 Linha de Escanteios (Over/Under)")
+    linha_escanteios = st.sidebar.selectbox(
+        "Selecione a linha de escanteios:",
+        [6.5, 7.5, 8.5, 9.5, 10.5, 11.5],
+        index=3
+    )
+    st.session_state.linha_escanteios = linha_escanteios
+
+    # Calcula probabilidades de escanteios
+    cantos = prever_escanteios_nb(home_team, away_team, df_jogos,
+                                num_jogos=num_jogos_selecionado, scenario=selected_scenario)
+
+    # Probabilidades Over/Under
+    st.session_state.over_under_cantos = calcular_over_under_cantos(
+        cantos, st.session_state.linha_escanteios)
+
+    # Quem tem mais cantos
+    mais_cantos = prob_home_mais_cantos(cantos)
+
+    # Exibição
+    st.markdown("### 🟦 Escanteios")
+    st.markdown(
+        f"- Over {st.session_state.linha_escanteios}: **{st.session_state.over_under_cantos['p_over']}%**")
+    st.markdown(
+        f"- Under {st.session_state.linha_escanteios}: **{st.session_state.over_under_cantos['p_under']}%**")
+    st.markdown(f"- 🏠 Home mais cantos: **{mais_cantos['home_mais']}%**")
+    st.markdown(f"- 🤝 Empate em cantos: **{mais_cantos['empate']}%**")
+    st.markdown(f"- ✈️ Away mais cantos: **{mais_cantos['away_mais']}%**")
     st.markdown("---")
+
+
 
     # Tabela de Jogos home e away
     mostrar_tabela_jogos(df_home, home_team, "🏠")

@@ -1,5 +1,5 @@
 import pandas as pd
-from scipy.stats import poisson
+from scipy.stats import poisson, nbinom
 import numpy as np
 
 
@@ -588,4 +588,105 @@ def prever_gol_ht(
         "jogos_home_considerados": len(df_home),
         "jogos_away_considerados": len(df_away),
         "cenario_usado": scenario,
+    }
+
+
+def _fit_nb_params(mu, var, eps=1e-9):
+    """
+    Ajuste dos parâmetros da Negativo Binomial na parametrização (r, p).
+    Se não houver overdispersão (var <= mu), retorna None (usar Poisson).
+    """
+    if np.isnan(mu) or np.isnan(var) or var <= mu + eps:
+        return None
+    r = (mu * mu) / (var - mu)
+    p = r / (r + mu)
+    return r, p
+
+
+def _pmf_nb_or_poisson(k_max, mu, var):
+    params = _fit_nb_params(mu, var)
+    if params is None:
+        return [poisson.pmf(k, mu) for k in range(k_max + 1)]
+    r, p = params
+    return [nbinom.pmf(k, r, p) for k in range(k_max + 1)]
+
+
+def prever_escanteios_nb(
+    home: str,
+    away: str,
+    df: pd.DataFrame,
+    num_jogos: int = 6,
+    scenario: str = "Casa/Fora",
+    max_cantos: int = 20,
+):
+    """
+    Modela escanteios com Negativo Binomial por time (fallback Poisson),
+    e retorna matriz conjunta assumindo independência.
+    """
+
+    if scenario == "Casa/Fora":
+        h = df[df["Home"] == home].tail(num_jogos)
+        a = df[df["Away"] == away].tail(num_jogos)
+        mu_h = h["H_Escanteios"].mean()
+        var_h = h["H_Escanteios"].var(ddof=1)
+        mu_a = a["A_Escanteios"].mean()
+        var_a = a["A_Escanteios"].var(ddof=1)
+    else:
+        h_all = df[(df["Home"] == home) | (df["Away"] == home)].tail(num_jogos)
+        a_all = df[(df["Home"] == away) | (df["Away"] == away)].tail(num_jogos)
+        # médias do time considerando o lado em cada jogo
+        vals_h = np.where(h_all["Home"] == home,
+                          h_all["H_Escanteios"], h_all["A_Escanteios"])
+        vals_a = np.where(a_all["Away"] == away,
+                          a_all["A_Escanteios"], a_all["H_Escanteios"])
+        mu_h = np.mean(vals_h)
+        var_h = np.var(vals_h, ddof=1)
+        mu_a = np.mean(vals_a)
+        var_a = np.var(vals_a, ddof=1)
+
+    probs_h = _pmf_nb_or_poisson(max_cantos, mu_h, var_h)
+    probs_a = _pmf_nb_or_poisson(max_cantos, mu_a, var_a)
+    matriz = np.outer(probs_h, probs_a)  # P(H=k, A=j)
+
+    return {
+        "mu_home_cantos": mu_h,
+        "mu_away_cantos": mu_a,
+        "matriz_cantos": matriz,
+        "cenario_usado": scenario,
+        "jogos_home_considerados": len(h) if scenario == "Casa/Fora" else len(h_all),
+        "jogos_away_considerados": len(a) if scenario == "Casa/Fora" else len(a_all),
+    }
+
+
+def calcular_over_under_cantos(resultados_cantos: dict, linha_total: float = 10.5):
+    """
+    Probabilidade de Over/Under X cantos (total do jogo), usando matriz conjunta.
+    """
+    M = resultados_cantos["matriz_cantos"]
+    kmax_h, kmax_a = M.shape[0]-1, M.shape[1]-1
+
+    p_over = 0.0
+    p_under = 0.0
+    for i in range(kmax_h + 1):
+        for j in range(kmax_a + 1):
+            total = i + j
+            if total > linha_total:
+                p_over += M[i, j]
+            else:
+                p_under += M[i, j]
+    return {"linha": linha_total, "p_over": round(p_over * 100, 2), "p_under": round(p_under * 100, 2)}
+
+
+def prob_home_mais_cantos(resultados_cantos: dict):
+    """
+    Probabilidades de quem tem mais escanteios e de empate em cantos.
+    """
+    M = resultados_cantos["matriz_cantos"]
+    p_home = np.tril(M, -1).sum()
+    p_away = np.triu(M, 1).sum()
+    p_emp = np.trace(M)
+    return {
+        "home_mais": round(p_home * 100, 2),
+        "empate": round(p_emp * 100, 2),
+        "away_mais": round(p_away * 100, 2),
     }
