@@ -337,70 +337,72 @@ if not df.empty and not df_proximos.empty:
     df_home_final = df_home.head(num_jogos_home)
     df_away_final = df_away.head(num_jogos_away)
 
-    df_resultado_mercados = dt.analisar_mercados(df_home_final, df_away_final)
+    # --- MERCADO DE GOLS ---
+    st.markdown("## 🎯 Mercado de Gols (FT)")
+
+    # 🎯 Probabilidades principais (Poisson)
+    linha_gols = st.sidebar.selectbox(
+        "Linha de Gols (Over/Under)",
+        [1.5, 2.5, 3.5],
+        index=1
+    )
+    over_under = dt.calcular_over_under(resultados, linha=linha_gols)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"- 🔼 Over {linha_gols}: **{over_under['p_over']}%**")
+    with col2:
+        st.markdown(f"- 🔽 Under {linha_gols}: **{over_under['p_under']}%**")
+
+    # --- Probabilidades por Mercado (Poisson) ---
+    linha_over15 = dt.calcular_over_under(resultados, linha=1.5)
+    linha_over25 = dt.calcular_over_under(resultados, linha=2.5)
+    linha_over35 = dt.calcular_over_under(resultados, linha=3.5)
+    btts = dt.calcular_btts(resultados)
+
+    # Monta DataFrame direto do modelo Poisson
+    df_resultado_mercados = pd.DataFrame([
+        {"Mercado": "Over 1.5", "Probabilidade (%)": linha_over15['p_over'], "Odd Justa": round(
+            100/linha_over15['p_over'], 2)},
+        {"Mercado": "Over 2.5", "Probabilidade (%)": linha_over25['p_over'], "Odd Justa": round(
+            100/linha_over25['p_over'], 2)},
+        {"Mercado": "Over 3.5", "Probabilidade (%)": linha_over35['p_over'], "Odd Justa": round(
+            100/linha_over35['p_over'], 2)},
+        {"Mercado": "BTTS", "Probabilidade (%)": btts['p_btts_sim'], "Odd Justa": round(
+            100/btts['p_btts_sim'], 2)},
+    ])
 
     st.subheader(
-        "🎯 Probabilidades por Mercado 🔎 Comparador de Valor (Value Bet)")
+        "🎯 Probabilidades por Mercado (Poisson) 🔎 Comparador de Valor")
 
-    # Cria colunas para cada mercado (Over 1.5, Over 2.5, BTTS)
     cols = st.columns(len(df_resultado_mercados))
-
-    # Itera sobre cada coluna e cada mercado correspondente
     for i, col in enumerate(cols):
         with col:
-            # Pega os dados do mercado atual (Over 1.5, Over 2.5, etc.)
             mercado = df_resultado_mercados.iloc[i]
-
-            # Exibe a métrica com a probabilidade e a odd justa, como antes
             st.metric(
                 label=mercado["Mercado"],
                 value=f'{mercado["Probabilidade (%)"]}%',
                 delta=f'Odd Justa: {mercado["Odd Justa"]}'
             )
 
-            # Adiciona o campo para o utilizador inserir a odd do mercado
             odd_mercado = st.number_input(
                 f"Odd Mercado para {mercado['Mercado']}",
                 min_value=1.00,
-                # Usa a odd justa como valor inicial para facilitar
                 value=float(mercado['Odd Justa']),
                 step=0.01,
                 format="%.2f",
-                # A 'key' é essencial para que cada campo seja único
                 key=f"odd_mercado_{mercado['Mercado']}"
             )
 
-            # Lógica para comparar e exibir se há valor
             if odd_mercado > mercado['Odd Justa']:
                 valor_ev = (odd_mercado / mercado['Odd Justa'] - 1) * 100
                 st.success(f"✅ Valor Encontrado: +{valor_ev:.2f}%")
             else:
                 st.warning("Sem valor aparente.")
-
     st.markdown("---")
-    linha_gols = st.sidebar.selectbox(
-        "Linha de Gols (Over/Under)",
-        [1.5, 2.0, 2.5, 3.0, 3.5],
-        index=2
-    )
-    over_under = dt.calcular_over_under(resultados, linha=linha_gols)
-
-    st.markdown(f"""
-    ### 📊 Probabilidades Over/Under {linha_gols} gols
-    - 🔼 Over {linha_gols}: **{over_under['p_over']}%**
-    - 🔽 Under {linha_gols}: **{over_under['p_under']}%**
-    """)
-
-    # Depois de rodar prever_gols(...)
-    btts = dt.calcular_btts(resultados)
-
-    st.markdown(f"""
-    ### 🤝 Both Teams to Score (BTTS)
-    - ✅ Sim: **{btts['p_btts_sim']}%**
-    - ❌ Não: **{btts['p_btts_nao']}%**
-    """)
-
-    st.markdown("---")
+    # Gráfico de barras para as probabilidades por mercado
+    vw.grafico_mercados(df_resultado_mercados,
+                     titulo="Probabilidades (Poisson + BTTS)")
+    
     analise = dt.analisar_cenario_partida(
         home_team,
         away_team,
@@ -435,11 +437,6 @@ if not df.empty and not df_proximos.empty:
                 <p style="font-size:18px; margin:0;">{p['prob']}%</p>
             </div>
             """, unsafe_allow_html=True)
-
-    # Gráfico de barras criando em views
-    st.subheader("📈 Visualização Gráfica")
-    vw.grafico_mercados(df_resultado_mercados)
-    st.markdown("---")
 
     # Estimativa de Escanteios
     st.markdown("### 📊 Estimativa de Escanteios", unsafe_allow_html=True)
