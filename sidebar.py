@@ -3,7 +3,8 @@ import datetime
 
 # Função para a barra lateral
 def sidebar():
-    st.sidebar.header("📊 Análise de Jogos de Futebol")
+    st.sidebar.markdown(
+        "<h3 style='text-align: center;'>⚽ Análise Futebol RedScore</h3>", unsafe_allow_html=True)
     # Tutorial
     tutorial_url = "https://www.notion.so/Tutorial-Redscore-2504bab1283b80f1af08fca804deb248"
 

@@ -2,7 +2,6 @@ import pandas as pd
 from scipy.stats import poisson, nbinom
 import numpy as np
 
-
 def drop_reset_index(df):
     df = df.dropna()
     df = df.reset_index(drop=True)

@@ -1,12 +1,26 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from datetime import datetime, timedelta
+from datetime import datetime
+import data as dt
 
+# ----------------------------
+# TÍTULO PRINCIPAL
+# ----------------------------
+def titulo_principal():
+    st.markdown("""
+    <div style="text-align:center; margin-bottom:20px;">
+        <h1>⚽ Análise Futebol - RedScore</h1>
+        <p style="font-size:18px; color:gray;">Probabilidades, Over/Under, BTTS e Escanteios</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ----------------------------
+# STATUS DE CARREGAMENTO
+# ----------------------------
 def mostrar_status_carregamento(df_proximos: pd.DataFrame, dia_br: str, dia_iso: str):
     """Mostra mensagens automáticas de acordo com a data escolhida e disponibilidade dos jogos."""
     hoje_iso = datetime.today().strftime("%Y-%m-%d")
-    ontem_iso = (datetime.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     if df_proximos.empty:
         if dia_iso > hoje_iso:
@@ -24,25 +38,9 @@ def mostrar_status_carregamento(df_proximos: pd.DataFrame, dia_br: str, dia_iso:
         else:
             st.toast(f"Jogos de {dia_br} carregados com sucesso! ✅")
 
-def titulo_principal():
-    st.markdown(
-        """
-    <h1 style='display: flex; align-items: center; justify-content: center; text-align: center;'>
-        📊 Análise de Jogos de Futebol
-    </h1>
-    """,
-        unsafe_allow_html=True
-    )
-    # Descrição da aplicação
-    st.markdown("""
-    <div  style="text-align: center; font-size: 16px;">
-        <p style='text-align: center;'>Esta é uma aplicação para análise de jogos de futebol usando dados do site Redscore.</p>
-        <p style='text-align: center;'>Você pode fazer upload de arquivos .txt com os dados dos jogos e obter análises detalhadas.</p>
-        <p style='text-align: center;'>Para mais informações, consulte o tutorial na barra lateral.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-
+# ----------------------------
+# ESTILO INTERVALO DE JOGOS
+# ----------------------------
 def configurar_estilo_intervalo_jogos():
     st.markdown("""
     <style>
@@ -66,6 +64,56 @@ def configurar_estilo_intervalo_jogos():
     }
     </style>
     """, unsafe_allow_html=True)
+
+# ----------------------------
+# TABELA DE ÚLTIMOS JOGOS
+# ----------------------------
+def mostrar_tabela_jogos(df, team, icon="🏠"):
+    if not df.empty:
+        st.markdown(f"### {icon} Últimos jogos do **{team}**")
+        st.dataframe(
+            df.reset_index(drop=True),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.warning(f"Nenhum jogo disponível para {team}.")
+
+# ----------------------------
+# CARD DE PLACAR PROVÁVEL
+# ----------------------------
+def card_placar(placar: str, prob: float):
+    """
+    Cria um card estilizado para exibir um placar e a sua probabilidade.
+    """
+    st.markdown(f"""
+    <div style="background-color:#1f2937; padding:15px; border-radius:8px; text-align:center; color:white; height: 100%;">
+        <h3 style="margin:0; font-size: 24px;">{placar}</h3>
+        <p style="font-size:18px; margin:0; color: #9CA3AF;">{prob:.2f}%</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ----------------------------
+# CARD DE VENCEDOR
+# ----------------------------
+def card_vencedor(vencedor_nome: str, home_team_nome: str, away_team_nome: str):
+    st.markdown("### 🏆 Vencedor da Partida")
+    # Lógica para definir a cor com base no vencedor
+    if vencedor_nome == home_team_nome:
+        cor = "#4CAF50"  # Verde para o time da casa
+    elif vencedor_nome == away_team_nome:
+        cor = "#F44336"  # Vermelho para o time visitante
+    else:
+        cor = "#607D8B"  # Cinza para o empate
+
+    st.markdown(
+        f"""
+        <div style='background-color:{cor};padding:10px;border-radius:8px'>
+            <h3 style='color:white;text-align:center'>{vencedor_nome}</h3>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 def mostrar_cards_media_gols(
     home_team: str,
@@ -102,6 +150,9 @@ def mostrar_cards_media_gols(
         </div>
         """, unsafe_allow_html=True)
 
+# ----------------------------
+# GRÁFICO DE MERCADOS
+# ----------------------------
 def grafico_mercados(df: pd.DataFrame, titulo: str = "Probabilidades por Mercado"):
     chart = alt.Chart(df).mark_bar().encode(
         x=alt.X('Mercado', sort=None),
@@ -109,8 +160,12 @@ def grafico_mercados(df: pd.DataFrame, titulo: str = "Probabilidades por Mercado
         color='Mercado',
         tooltip=['Mercado', 'Probabilidade (%)', 'Odd Justa']
     )
+    st.subheader(titulo)
     st.altair_chart(chart, use_container_width=True)
 
+# ----------------------------
+# TABELA DE JOGOS HOME E AWAY
+# ----------------------------
 def mostrar_tabela_jogos(df: pd.DataFrame, team: str, tipo: str):
     """Mostra a tabela de últimos jogos de um time (Home/Away)."""
     def auto_height(df, base=35, header=40, max_height=500):
@@ -125,3 +180,4 @@ def mostrar_tabela_jogos(df: pd.DataFrame, team: str, tipo: str):
         height=auto_height(df),
         hide_index=True
     )
+
