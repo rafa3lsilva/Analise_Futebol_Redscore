@@ -87,7 +87,7 @@ def card_placar(placar: str, prob: float):
     Cria um card estilizado para exibir um placar e a sua probabilidade.
     """
     st.markdown(f"""
-    <div style="background-color:#1f2937; padding:15px; border-radius:8px; text-align:center; color:white; height: 100%;">
+    <div style="background-color:#1f2937; padding:15px; border-radius:8px; text-align:center; color:white; height: 100%;margin-bottom:10px;">
         <h3 style="margin:0; font-size: 24px;">{placar}</h3>
         <p style="font-size:18px; margin:0; color: #9CA3AF;">{prob:.2f}%</p>
     </div>
@@ -129,7 +129,7 @@ def mostrar_cards_media_gols(
     with col1:
         st.markdown(f"""
         <div style="background-color:#1f77b4; padding:15px; border-radius:8px; 
-                    text-align:center; color:white; margin-bottom:15px;">
+                    text-align:center; color:white; margin-bottom:10px;">
             <h3>🏠 {home_team}</h3>
             <p style="font-size:18px;">⚽ Média de Gols Marcados: 
                 <strong>{media_home_gols_marcados:.2f}</strong></p>
@@ -141,7 +141,7 @@ def mostrar_cards_media_gols(
     with col2:
         st.markdown(f"""
         <div style="background-color:#d62728; padding:15px; border-radius:8px; 
-                    text-align:center; color:white; margin-bottom:15px;">
+                    text-align:center; color:white; margin-bottom:10px;">
             <h3>✈️ {away_team}</h3>
             <p style="font-size:18px;">⚽ Média de Gols Marcados: 
                 <strong>{media_away_gols_marcados:.2f}</strong></p>
