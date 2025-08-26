@@ -166,4 +166,28 @@ def mostrar_tabela_jogos(df: pd.DataFrame, team: str, tipo: str):
         height=auto_height(df),
         hide_index=True
     )
+def home_away(home_team: str, away_team: str):
+    col1, col_vs, col2 = st.columns([5, 1, 5])
 
+    with col1:
+        st.markdown(f"""
+        <div style="background-color: #1f77b4; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
+            <h3 style="margin: 0;">🏠 {home_team}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_vs:
+        st.markdown(f"""
+        <div style="text-align: center; padding-top: 30px;">
+            <p style="font-size: 28px; font-weight: bold; color: #888;">VS</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div style="background-color: #d62728; border-radius: 10px; padding: 25px; text-align: center; color: white; box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);">
+            <h3 style="margin: 0;">{away_team} ✈️</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)

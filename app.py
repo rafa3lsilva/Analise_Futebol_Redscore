@@ -137,6 +137,9 @@ if not df.empty and not df_proximos.empty:
     # ----------------------------
     # INTERVALO DE JOGOS
     # ----------------------------
+    # nome das equipes
+    vw.home_away(home_team, away_team)
+    # intervalo de jogos
     st.markdown("### 📅 Intervalo de Jogos")
     intervalo = st.radio("", options=["Últimos 5 jogos", "Últimos 6 jogos",
                          "Últimos 8 jogos", "Últimos 10 jogos"], index=1, horizontal=True)
