@@ -66,20 +66,6 @@ def configurar_estilo_intervalo_jogos():
     """, unsafe_allow_html=True)
 
 # ----------------------------
-# TABELA DE ÚLTIMOS JOGOS
-# ----------------------------
-def mostrar_tabela_jogos(df, team, icon="🏠"):
-    if not df.empty:
-        st.markdown(f"### {icon} Últimos jogos do **{team}**")
-        st.dataframe(
-            df.reset_index(drop=True),
-            use_container_width=True,
-            hide_index=True
-        )
-    else:
-        st.warning(f"Nenhum jogo disponível para {team}.")
-
-# ----------------------------
 # CARD DE PLACAR PROVÁVEL
 # ----------------------------
 def card_placar(placar: str, prob: float):
