@@ -316,6 +316,13 @@ def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 6,
 
     matriz = np.outer(probs_home, probs_away)
 
+    # Calcula a soma total da matriz
+    soma_total_matriz = matriz.sum()
+
+    # Divide cada célula pela soma total para que a nova soma seja 1.
+    if soma_total_matriz > 0:
+        matriz = matriz / soma_total_matriz
+
     # Probabilidades agregadas
     p_home = np.tril(matriz, -1).sum()
     p_away = np.triu(matriz, 1).sum()

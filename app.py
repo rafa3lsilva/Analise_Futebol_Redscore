@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import data as dt
 import sidebar as sb
 import services as sv
@@ -355,6 +356,8 @@ if not df.empty and not df_proximos.empty:
     for i, col in enumerate(cols):
         with col:
             mercado = df_resultado_mercados.iloc[i]
+            odd_justa_safe = mercado['Odd Justa'] if np.isfinite(
+                mercado['Odd Justa']) else 1.0
             st.metric(
                 label=mercado["Mercado"],
                 value=f'{mercado["Probabilidade (%)"]}%',
@@ -364,7 +367,7 @@ if not df.empty and not df_proximos.empty:
             odd_mercado = st.number_input(
                 f"Odd Mercado para {mercado['Mercado']}",
                 min_value=1.00,
-                value=float(mercado['Odd Justa']),
+                value=odd_justa_safe,
                 step=0.01,
                 format="%.2f",
                 key=f"odd_mercado_{mercado['Mercado']}"
