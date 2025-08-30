@@ -37,14 +37,15 @@ def carregar_base_historica() -> pd.DataFrame:
     """Carrega e valida a base histórica principal."""
     try:
         df = pd.read_csv(URL_DADOS)
-        # Converte a coluna 'Data'
+
         df['Data'] = pd.to_datetime(
-            df['Data'], format="%d-%m-%Y", errors="coerce")
+            df['Data'], format="%Y-%m-%d", errors="coerce")
         jogos_com_data_invalida = df['Data'].isnull().sum()
 
         if jogos_com_data_invalida > 0:
             st.warning(
-                f"{jogos_com_data_invalida} jogo(s) foram ignorados por erro na data.")
+                f"{jogos_com_data_invalida} jogo(s) foram ignorados por erro na data."
+            )
             df.dropna(subset=['Data'], inplace=True)
 
         df['Data'] = df['Data'].dt.date
