@@ -387,6 +387,11 @@ if not df.empty and not df_proximos.empty:
         vw.grafico_mercados(df_resultado_mercados,
                             titulo="Probabilidades (Poisson + BTTS)")
 
+    # --- ESCANTEIOS ---
+    st.markdown("## 🟦 Estimativa de Escanteios")
+    # 🎯 Modelo principal (NegBin)
+    st.markdown("### Probabilidades (Modelo NegBin)")    
+
     # Linhas Over/Under de Escanteios na sidebar
     # A nova linha, com o texto centralizado
     st.sidebar.markdown(
@@ -408,22 +413,6 @@ if not df.empty and not df_proximos.empty:
 
     # Quem tem mais cantos
     mais_cantos = dt.prob_home_mais_cantos(cantos)
-
-    # --- ESCANTEIOS ---
-    st.markdown("## 🟦 Estimativa de Escanteios")
-
-    # 🎯 Modelo principal (NegBin)
-    cantos = dt.prever_escanteios_nb(
-        home_team, away_team, df_jogos,
-        num_jogos=num_jogos_selecionado,
-        scenario=selected_scenario
-    )
-    st.session_state.over_under_cantos = dt.calcular_over_under_cantos(
-        cantos, st.session_state.linha_escanteios
-    )
-    mais_cantos = dt.prob_home_mais_cantos(cantos)
-
-    st.markdown("### Probabilidades (Modelo NegBin)")
 
     col1, col2 = st.columns(2)
     with col1:
