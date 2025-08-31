@@ -50,7 +50,24 @@ def carregar_base_historica() -> pd.DataFrame:
 
         df['Data'] = df['Data'].dt.date
         df = df.sort_values(by="Data", ascending=False).reset_index(drop=True)
+
+        # ✅ Validação de colunas essenciais
+        colunas_essenciais = [
+            "Home", "Away", "Data",
+            "H_Gols_FT", "A_Gols_FT",
+            "H_Gols_HT", "A_Gols_HT",
+            "H_Escanteios", "A_Escanteios",
+            "H_Chute", "A_Chute",
+            "H_Ataques", "A_Ataques"
+        ]
+
+        faltando = [c for c in colunas_essenciais if c not in df.columns]
+        if faltando:
+            st.error(f"⚠️ Colunas ausentes no dataset: {faltando}")
+            return pd.DataFrame(columns=colunas_essenciais)
+
         return df
+
     except Exception as e:
         st.error(f"Erro ao carregar a base histórica: {e}")
         return pd.DataFrame()
