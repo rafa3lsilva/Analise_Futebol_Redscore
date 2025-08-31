@@ -1,6 +1,7 @@
 import pandas as pd
 from scipy.stats import poisson, nbinom
 import numpy as np
+import streamlit as st
 
 def drop_reset_index(df):
     df = df.dropna()
@@ -277,6 +278,7 @@ def calcular_forca_times(df: pd.DataFrame, min_jogos: int = 3):
     return ataque, defesa, media_gols_casa, media_gols_fora
 
 
+@st.cache_data
 def prever_gols(home: str, away: str, df: pd.DataFrame, num_jogos: int = 6,
                 min_jogos: int = 3, max_gols: int = 5, scenario: str = "Casa/Fora"):
     """
@@ -395,6 +397,7 @@ def calcular_btts(resultados: dict):
     }
 
 
+@st.cache_data
 def analisar_cenario_partida(
     home: str,
     away: str,
@@ -584,6 +587,7 @@ def _pmf_nb_or_poisson(k_max, mu, var):
     return [nbinom.pmf(k, r, p) for k in range(k_max + 1)]
 
 
+@st.cache_data
 def prever_escanteios_nb(
     home: str,
     away: str,
