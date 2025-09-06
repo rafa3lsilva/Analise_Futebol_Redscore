@@ -22,6 +22,15 @@ if "df_jogos" not in st.session_state:
 if "data_loaded_successfully" not in st.session_state:
     st.session_state.data_loaded_successfully = False
 
+# ----------------------------
+# ESTADO DA SESSÃO PARA O FLUXO
+# ----------------------------
+# Garante que as variáveis de estado existem
+if 'resultados_filtro' not in st.session_state:
+    st.session_state.resultados_filtro = None
+if 'jogo_selecionado_pelo_filtro' not in st.session_state:
+    st.session_state.jogo_selecionado_pelo_filtro = None
+
 st.set_page_config(
     page_title="Análise Futebol",
     page_icon=":soccer:",
@@ -90,70 +99,151 @@ vw.mostrar_status_carregamento(df_proximos_jogos, dia_br, dia_iso)
 vw.configurar_estilo_intervalo_jogos()
 
 # ----------------------------
-# SELEÇÃO DE JOGO
+# FILTRO DE OPORTUNIDADES
 # ----------------------------
-if not df.empty and not df_proximos.empty:
-    # Filtros sequenciais (hora → liga → confronto)
-    selected_time = st.sidebar.selectbox(
-        "Selecione o Horário:", sorted(df_proximos['hora'].unique()))
-    jogos_filtrado_hora = df_proximos[df_proximos['hora'] == selected_time]
+with st.expander("🔎 Filtro de Oportunidades", expanded=True):
+    st.markdown(
+        "Encontre jogos com base em critérios de probabilidade para todos os jogos do dia.")
 
-    selected_league = st.sidebar.selectbox(
-        "Selecione a Liga:", sorted(jogos_filtrado_hora['liga'].unique()))
+    col1, col2 = st.columns(2)
+    with col1:
+        num_jogos_filtro = st.selectbox("Analisar com base nos últimos:", options=[
+                                        5, 6, 8, 10], index=1, key="num_jogos_filtro")
+    with col2:
+        cenario_filtro = st.selectbox("Cenário de Análise:", options=[
+                                      "Geral", "Casa/Fora"], index=1, key="cenario_filtro")
+
+    mercados_disponiveis = {
+        "Vitória Casa (%)": "prob_home", "Empate (%)": "prob_draw", "Vitória Visitante (%)": "prob_away",
+        "Over 2.5 (%)": "over_2.5", "BTTS Sim (%)": "btts_sim"
+    }
+    mercado_selecionado = st.selectbox(
+        "Selecione o Mercado:", options=list(mercados_disponiveis.keys()))
+    prob_minima = st.slider("Probabilidade Mínima (%)", 0, 100, 60, 5)
+
+    if st.button("🔎 Filtrar Jogos"):
+        st.session_state.jogo_selecionado_pelo_filtro = None
+        if df_proximos.empty:
+            st.warning("Nenhum jogo carregado para a data selecionada.")
+        else:
+            jogos_filtrados = []
+            total_jogos = len(df_proximos)
+            barra_progresso = st.progress(0, text="Analisando jogos...")
+
+            for index, jogo in df_proximos.iterrows():
+                home_team, away_team = jogo['home'], jogo['away']
+                analise = dt.analisar_cenario_partida(
+                    home_team, away_team, df_jogos, num_jogos=num_jogos_filtro, scenario=cenario_filtro, linha_gols=2.5)
+
+                if "erro" not in analise:
+                    chave_mercado = mercados_disponiveis[mercado_selecionado]
+                    prob_atual = 0
+                    if chave_mercado == "prob_home":
+                        prob_atual = analise['prob_home']
+                    elif chave_mercado == "prob_draw":
+                        prob_atual = analise['prob_draw']
+                    elif chave_mercado == "prob_away":
+                        prob_atual = analise['prob_away']
+                    elif chave_mercado == "over_2.5":
+                        prob_atual = analise['over_under']['p_over']
+                    elif chave_mercado == "btts_sim":
+                        prob_atual = analise['btts']['p_btts_sim']
+
+                    if prob_atual >= prob_minima:
+                        odd_justa = round(100 / prob_atual,
+                                          2) if prob_atual > 0 else 0
+                        jogos_filtrados.append({
+                            "Hora": jogo['hora'], "Liga": jogo['liga'], "Home": home_team, "Away": away_team,
+                            "Confronto": f"{home_team} x {away_team}", "Mercado": mercado_selecionado,
+                            "Prob. (%)": round(prob_atual, 2), "Odd Justa": odd_justa
+                        })
+                barra_progresso.progress(
+                    (index + 1) / total_jogos, text=f"Analisando: {home_team} x {away_team}")
+
+            st.session_state.resultados_filtro = pd.DataFrame(
+                jogos_filtrados).sort_values(by="Prob. (%)", ascending=False)
+
+    # Exibe os resultados interativos do filtro
+    if st.session_state.resultados_filtro is not None:
+        if st.session_state.resultados_filtro.empty:
+            st.info("Nenhum jogo encontrado com os critérios selecionados.")
+        else:
+            st.success(
+                f"{len(st.session_state.resultados_filtro)} jogos encontrados!")
+            for index, row in st.session_state.resultados_filtro.iterrows():
+                col1, col2, col3 = st.columns([4, 2, 1])
+                with col1:
+                    st.write(f"**{row['Confronto']}** ({row['Liga']})")
+                    st.write(
+                        f"*{row['Mercado']}* | **Prob: {row['Prob. (%)']}%** | **Odd Justa: {row['Odd Justa']}**")
+                with col3:
+                    if st.button("Analisar 🔎", key=f"analise_{index}"):
+                        st.session_state.jogo_selecionado_pelo_filtro = {
+                            "home": row['Home'], "away": row['Away'], "liga": row['Liga'], "confronto": row['Confronto']}
+                        st.rerun()
+            #st.markdown("---")
+
+# -----------------------------------------------
+# ANÁLISE INDIVIDUAL DE JOGO
+# -----------------------------------------------
+jogo_para_analisar_encontrado = False
+home_team, away_team = None, None
+
+if st.session_state.jogo_selecionado_pelo_filtro:
+    jogo_selecionado_data = st.session_state.jogo_selecionado_pelo_filtro
+    home_team = jogo_selecionado_data['home']
+    away_team = jogo_selecionado_data['away']
+    st.sidebar.info(f"Analisando: {jogo_selecionado_data['confronto']}")
+    if st.sidebar.button("Voltar a usar filtros da sidebar"):
+        st.session_state.jogo_selecionado_pelo_filtro = None
+        st.rerun()
+    jogo_para_analisar_encontrado = True
+elif not df.empty and not df_proximos.empty:
+    selected_time = st.sidebar.selectbox("Selecione o Horário:", sorted(
+        df_proximos['hora'].unique()), key="horario_individual")
+    jogos_filtrado_hora = df_proximos[df_proximos['hora'] == selected_time]
+    selected_league = st.sidebar.selectbox("Selecione a Liga:", sorted(
+        jogos_filtrado_hora['liga'].unique()), key="liga_individual")
     jogos_filtrado_liga = jogos_filtrado_hora[jogos_filtrado_hora['liga']
                                               == selected_league]
-
-    selected_game = st.sidebar.selectbox(
-        "Escolha o Jogo:", sorted(jogos_filtrado_liga['confronto'].unique()))
+    selected_game = st.sidebar.selectbox("Escolha o Jogo:", sorted(
+        jogos_filtrado_liga['confronto'].unique()), key="jogo_individual")
     selected_game_data = jogos_filtrado_liga[jogos_filtrado_liga['confronto'] == selected_game]
 
-    if selected_game_data.empty:
-        st.warning("Por favor, selecione um jogo válido para iniciar a análise.")
-        st.stop()
+    if not selected_game_data.empty:
+        home_team, away_team = selected_game_data[['home', 'away']].iloc[0]
+        jogo_para_analisar_encontrado = True
 
-    home_team, away_team = selected_game_data[['home', 'away']].iloc[0]
+# O resto do código da análise só executa se tivermos um jogo para analisar
+if jogo_para_analisar_encontrado:
+    st.header(f"Análise Detalhada: {home_team} vs {away_team}")
 
-    # Cenário
     selected_scenario = st.sidebar.selectbox(
-        "Cenário de Análise:",
-        ["Geral", "Casa/Fora"],
+        "Cenário de Análise:", ["Geral", "Casa/Fora"], index=1,
+        key="cenario_individual",
         help="Geral: todos os jogos. Casa/Fora: só casa do mandante e fora do visitante."
     )
 
-    # Define bases de dados de acordo com cenário
     if selected_scenario == 'Geral':
-        df_home_base = df[(df['Home'].str.lower() == home_team.lower()) |
-                          (df['Away'].str.lower() == home_team.lower())].copy()
-        df_away_base = df[(df['Home'].str.lower() == away_team.lower()) |
-                          (df['Away'].str.lower() == away_team.lower())].copy()
+        df_home_base = df[(df['Home'].str.lower() == home_team.lower()) | (
+            df['Away'].str.lower() == home_team.lower())].copy()
+        df_away_base = df[(df['Home'].str.lower() == away_team.lower()) | (
+            df['Away'].str.lower() == away_team.lower())].copy()
     else:
         df_home_base = df[df['Home'].str.lower() == home_team.lower()].copy()
         df_away_base = df[df['Away'].str.lower() == away_team.lower()].copy()
 
-    # Ordenar jogos mais recentes
     df_home_base, df_away_base = df_home_base.sort_values(
         by='Data', ascending=False), df_away_base.sort_values(by='Data', ascending=False)
 
-    # ----------------------------
-    # INTERVALO DE JOGOS
-    # ----------------------------
-    # nome das equipes
     vw.home_away(home_team, away_team)
-    # intervalo de jogos
     st.markdown("### 📅 Intervalo de Jogos")
-    intervalo = st.radio("", options=["Últimos 5 jogos", "Últimos 6 jogos",
-                         "Últimos 8 jogos", "Últimos 10 jogos"], index=1, horizontal=True)
+    intervalo = st.radio("", options=["Últimos 5 jogos", "Últimos 6 jogos", "Últimos 8 jogos",
+                         "Últimos 10 jogos"], index=1, horizontal=True, key="intervalo_jogos")
     num_jogos_selecionado = int(intervalo.split()[1])
-    df_home, df_away = df_home_base.head(
-        num_jogos_selecionado), df_away_base.head(num_jogos_selecionado)
 
-    # Ajusta o número de jogos se o usuário pedir mais do que o disponível
-    num_jogos_home = min(num_jogos_selecionado, len(df_home_base))
-    num_jogos_away = min(num_jogos_selecionado, len(df_away_base))
-
-    # Pega os N primeiros jogos (os mais recentes, pois já ordenámos no início) para a análise final
-    df_home = df_home_base.head(num_jogos_home)
-    df_away = df_away_base.head(num_jogos_away)
+    df_home = df_home_base.head(num_jogos_selecionado)
+    df_away = df_away_base.head(num_jogos_selecionado)
     st.markdown("---")
 
     # ----------------------------
