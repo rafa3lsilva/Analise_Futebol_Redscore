@@ -108,12 +108,12 @@ with st.expander("🔎 Filtro de Oportunidades", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         num_jogos_filtro = st.selectbox("Analisar com base nos últimos:", options=[
-                                        5, 6, 8, 10], index=3, key="num_jogos_filtro")
+                                        5, 6, 8, 10], index=1, key="num_jogos_filtro")
     with col2:
         cenario_filtro = st.selectbox("Cenário de Análise:", options=[
-                                      "Geral", "Casa/Fora"], index=0, key="cenario_filtro")
+                                      "Geral", "Casa/Fora"], index=1, key="cenario_filtro")
 
-    # --- DICIONÁRIO DE MERCADOS EXPANDIDO ---
+    # --- DICIONÁRIO DE MERCADOS ---
     mercados_disponiveis = {
         "Vitória Casa (%)": "prob_home",
         "Empate (%)": "prob_draw",
@@ -197,17 +197,7 @@ with st.expander("🔎 Filtro de Oportunidades", expanded=True):
             st.success(
                 f"{len(st.session_state.resultados_filtro)} jogos encontrados!")
             for index, row in st.session_state.resultados_filtro.iterrows():
-                col1, col2, col3 = st.columns([4, 2, 1])
-                with col1:
-                    st.write(f"**{row['Confronto']}** ({row['Liga']})")
-                    st.write(
-                        f"*{row['Mercado']}* | **Prob: {row['Prob. (%)']}%** | **Odd Justa: {row['Odd Justa']}**")
-                with col3:
-                    if st.button("Analisar 🔎", key=f"analise_{index}"):
-                        st.session_state.jogo_selecionado_pelo_filtro = {
-                            "home": row['Home'], "away": row['Away'], "liga": row['Liga'], "confronto": row['Confronto']}
-                        st.rerun()
-                st.markdown("---")
+                vw.card_resultado_filtro(index, row)
 
 # -----------------------------------------------
 # ANÁLISE INDIVIDUAL DE JOGO
@@ -242,7 +232,7 @@ elif not df.empty and not df_proximos.empty:
 
 # O resto do código da análise só executa se tivermos um jogo para analisar
 if jogo_para_analisar_encontrado:
-    st.header(f"Análise Detalhada: {home_team} vs {away_team}")
+    st.header(f"Análise Detalhada do Confronto:")
 
     selected_scenario = st.sidebar.selectbox(
         "Cenário de Análise:", ["Geral", "Casa/Fora"], index=1,

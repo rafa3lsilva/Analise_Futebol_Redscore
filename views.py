@@ -191,3 +191,34 @@ def home_away(home_team: str, away_team: str):
         """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
+
+# ----------------------------
+# CARD DE RESULTADO DO FILTRO
+# ----------------------------
+def card_resultado_filtro(index, row_data):
+    """
+    Cria um card expansível e interativo para um resultado do filtro de oportunidades.
+    """
+    # Cria um expander para cada jogo
+    with st.expander(f"⚽ **{row_data['Confronto']}** ({row_data['Liga']})"):
+
+        # Organiza as informações em colunas
+        col1, col2 = st.columns([3, 1])
+
+        with col1:
+            st.metric(label="Mercado Analisado", value=row_data['Mercado'])
+            st.metric(label="📊 Probabilidade Encontrada", value=f"{row_data['Prob. (%)']}%",
+                      delta=f"Odd Justa: {row_data['Odd Justa']}")
+
+        with col2:
+            st.write("")  # Espaçamento
+            st.write("")  # Espaçamento
+            # O botão para análise fica aqui, bem visível
+            if st.button("Analisar Jogo 🔎", key=f"analise_{index}", use_container_width=True):
+                st.session_state.jogo_selecionado_pelo_filtro = {
+                    "home": row_data['Home'],
+                    "away": row_data['Away'],
+                    "liga": row_data['Liga'],
+                    "confronto": row_data['Confronto']
+                }
+                st.rerun()
