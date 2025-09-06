@@ -24,7 +24,7 @@ def mostrar_status_carregamento(df_proximos: pd.DataFrame, dia_br: str, dia_iso:
 
     if df_proximos.empty:
         if dia_iso > hoje_iso:
-            st.info(f"Jogos do dia {dia_br} ainda não estão disponíveis. ⏳")
+            st.info(f"Jogos do dia {dia_br} ainda não estão disponíveis, aguarde a atualização! ⏳")
         elif dia_iso < hoje_iso:
             st.info(f"Não existem dados para os jogos de {dia_br}. ℹ️")
         else:
