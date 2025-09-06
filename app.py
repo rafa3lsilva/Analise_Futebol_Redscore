@@ -108,14 +108,23 @@ with st.expander("🔎 Filtro de Oportunidades", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         num_jogos_filtro = st.selectbox("Analisar com base nos últimos:", options=[
-                                        5, 6, 8, 10], index=1, key="num_jogos_filtro")
+                                        5, 6, 8, 10], index=3, key="num_jogos_filtro")
     with col2:
         cenario_filtro = st.selectbox("Cenário de Análise:", options=[
-                                      "Geral", "Casa/Fora"], index=1, key="cenario_filtro")
+                                      "Geral", "Casa/Fora"], index=0, key="cenario_filtro")
 
+    # --- DICIONÁRIO DE MERCADOS EXPANDIDO ---
     mercados_disponiveis = {
-        "Vitória Casa (%)": "prob_home", "Empate (%)": "prob_draw", "Vitória Visitante (%)": "prob_away",
-        "Over 2.5 (%)": "over_2.5", "BTTS Sim (%)": "btts_sim"
+        "Vitória Casa (%)": "prob_home",
+        "Empate (%)": "prob_draw",
+        "Vitória Visitante (%)": "prob_away",
+        "Over 1.5 (%)": "over_1.5",
+        "Under 1.5 (%)": "under_1.5",
+        "Over 2.5 (%)": "over_2.5",
+        "Under 2.5 (%)": "under_2.5",
+        "BTTS Sim (%)": "btts_sim",
+        "BTTS Não (%)": "btts_nao",
+        "Gol no 1º Tempo (Over 0.5 HT) (%)": "gol_ht"
     }
     mercado_selecionado = st.selectbox(
         "Selecione o Mercado:", options=list(mercados_disponiveis.keys()))
@@ -132,22 +141,39 @@ with st.expander("🔎 Filtro de Oportunidades", expanded=True):
 
             for index, jogo in df_proximos.iterrows():
                 home_team, away_team = jogo['home'], jogo['away']
-                analise = dt.analisar_cenario_partida(
-                    home_team, away_team, df_jogos, num_jogos=num_jogos_filtro, scenario=cenario_filtro, linha_gols=2.5)
 
-                if "erro" not in analise:
+                # --- LÓGICA DE CÁLCULO OTIMIZADA ---
+                # 1. Calcula os resultados base para golos FT (Poisson)
+                resultados_gols = dt.prever_gols(
+                    home_team, away_team, df_jogos, num_jogos=num_jogos_filtro, scenario=cenario_filtro)
+
+                if "erro" not in resultados_gols:
+                    # 2. Calcula todas as probabilidades necessárias a partir dos resultados base
+                    over_under_15 = dt.calcular_over_under(
+                        resultados_gols, linha=1.5)
+                    over_under_25 = dt.calcular_over_under(
+                        resultados_gols, linha=2.5)
+                    btts = dt.calcular_btts(resultados_gols)
+                    gol_ht_analise = dt.prever_gol_ht(
+                        home_team, away_team, df_jogos, num_jogos=num_jogos_filtro, scenario=cenario_filtro)
+
+                    # 3. Armazena todas as probabilidades num dicionário para fácil acesso
+                    probabilidades_jogo = {
+                        "prob_home": resultados_gols['p_home'] * 100,
+                        "prob_draw": resultados_gols['p_draw'] * 100,
+                        "prob_away": resultados_gols['p_away'] * 100,
+                        "over_1.5": over_under_15['p_over'],
+                        "under_1.5": over_under_15['p_under'],
+                        "over_2.5": over_under_25['p_over'],
+                        "under_2.5": over_under_25['p_under'],
+                        "btts_sim": btts['p_btts_sim'],
+                        "btts_nao": btts['p_btts_nao'],
+                        "gol_ht": gol_ht_analise['p_gol_ht']
+                    }
+
+                    # 4. Obtém a probabilidade do mercado selecionado e verifica a condição
                     chave_mercado = mercados_disponiveis[mercado_selecionado]
-                    prob_atual = 0
-                    if chave_mercado == "prob_home":
-                        prob_atual = analise['prob_home']
-                    elif chave_mercado == "prob_draw":
-                        prob_atual = analise['prob_draw']
-                    elif chave_mercado == "prob_away":
-                        prob_atual = analise['prob_away']
-                    elif chave_mercado == "over_2.5":
-                        prob_atual = analise['over_under']['p_over']
-                    elif chave_mercado == "btts_sim":
-                        prob_atual = analise['btts']['p_btts_sim']
+                    prob_atual = probabilidades_jogo[chave_mercado]
 
                     if prob_atual >= prob_minima:
                         odd_justa = round(100 / prob_atual,
@@ -181,7 +207,7 @@ with st.expander("🔎 Filtro de Oportunidades", expanded=True):
                         st.session_state.jogo_selecionado_pelo_filtro = {
                             "home": row['Home'], "away": row['Away'], "liga": row['Liga'], "confronto": row['Confronto']}
                         st.rerun()
-            #st.markdown("---")
+                st.markdown("---")
 
 # -----------------------------------------------
 # ANÁLISE INDIVIDUAL DE JOGO
