@@ -200,7 +200,7 @@ def card_resultado_filtro(index, row_data):
     Cria um card expansível e interativo para um resultado do filtro de oportunidades.
     """
     # Cria um expander para cada jogo
-    with st.expander(f"⚽ **{row_data['Confronto']}** ({row_data['Liga']})"):
+    with st.expander(f"⚽ **{row_data['Confronto']}** - **{row_data['Liga']}** - **{row_data['Hora']}**"):
 
         # Organiza as informações em colunas
         col1, col2 = st.columns([3, 1])

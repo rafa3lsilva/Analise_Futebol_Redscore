@@ -186,8 +186,15 @@ with st.expander("🔎 Filtro de Oportunidades", expanded=True):
                 barra_progresso.progress(
                     (index + 1) / total_jogos, text=f"Analisando: {home_team} x {away_team}")
 
-            st.session_state.resultados_filtro = pd.DataFrame(
-                jogos_filtrados).sort_values(by="Prob. (%)", ascending=False)
+            # 1. Cria o DataFrame a partir da lista
+            df_resultados = pd.DataFrame(jogos_filtrados)
+
+            # 2. Verifica se o DataFrame não está vazio ANTES de ordenar
+            if not df_resultados.empty:
+                df_resultados = df_resultados.sort_values(by="Prob. (%)", ascending=False)
+
+            # 3. Salva o DataFrame (ordenado ou vazio) no estado da sessão
+            st.session_state.resultados_filtro = df_resultados
 
     # Exibe os resultados interativos do filtro
     if st.session_state.resultados_filtro is not None:
